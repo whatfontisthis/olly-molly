@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 interface AgentExecuteRequest {
     ticket_id: string;
+    feedback?: string;
 }
 
 function buildAgentPrompt(ticket: {
@@ -17,11 +18,15 @@ function buildAgentPrompt(ticket: {
 }, project: {
     name: string;
     path: string;
-}): string {
+}, feedback?: string): string {
     // Check if role is QA to add specific port instructions
     const isQA = agent.role === 'QA';
     const qaInstruction = isQA
         ? `\nIMPORTANT: When running tests or starting servers, you MUST use port 3001 (or any port other than 1234) to avoid conflict with the main development server. For example, use "PORT=3001 npm run dev" or configure your test runner to target port 3001.`
+        : '';
+
+    const feedbackSection = feedback
+        ? `\n\nIMPORTANT FEEDBACK FROM USER:\n${feedback}\n\nPlease address this feedback specifically in your implementation.`
         : '';
 
     return `You are acting as ${agent.name} (${agent.role}) for the project "${project.name}".
@@ -33,6 +38,7 @@ ${agent.system_prompt}
 TASK TO COMPLETE:
 Title: ${ticket.title}
 ${ticket.description ? `Description: ${ticket.description}` : ''}
+${feedbackSection}
 
 ---
 
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Build prompt
-        const prompt = buildAgentPrompt(ticket, agent, project);
+        const prompt = buildAgentPrompt(ticket, agent, project, body.feedback);
 
         // Generate job ID
         const jobId = uuidv4();

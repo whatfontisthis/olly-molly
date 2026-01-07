@@ -65,6 +65,7 @@ const statusOptions = [
     { value: 'TODO', label: 'To Do' },
     { value: 'IN_PROGRESS', label: 'In Progress' },
     { value: 'IN_REVIEW', label: 'In Review' },
+    { value: 'NEED_FIX', label: 'Need Fix' },
     { value: 'COMPLETE', label: 'Complete' },
     { value: 'ON_HOLD', label: 'On Hold' },
 ];
@@ -87,6 +88,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
     const [executing, setExecuting] = useState(false);
     const [runningJob, setRunningJob] = useState<RunningJob | null>(null);
+    const [feedback, setFeedback] = useState('');
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const outputRef = useRef<HTMLPreElement>(null);
 
@@ -178,7 +180,10 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
             const res = await fetch('/api/agent/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ticket_id: ticket.id }),
+                body: JSON.stringify({
+                    ticket_id: ticket.id,
+                    feedback: feedback.trim() || undefined
+                }),
             });
 
             const data = await res.json();
@@ -292,7 +297,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     onClick={handleExecuteAgent}
                                     disabled={!hasActiveProject}
                                 >
-                                    🚀 Claude로 작업 실행
+                                    {status === 'NEED_FIX' ? '🔁 피드백 반영 및 재시도' : '🚀 Claude로 작업 실행'}
                                 </Button>
                             ) : (
                                 <Button
@@ -306,6 +311,17 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                             )}
                         </div>
 
+                        {/* Feedback Input */}
+                        <div className="mt-3">
+                            <Textarea
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                                placeholder="에이전트에게 전달할 피드백이나 수정 요청사항을 입력하세요... (선택)"
+                                rows={2}
+                                className="text-sm bg-[var(--bg-secondary)]"
+                            />
+                        </div>
+
                         {!hasActiveProject && (
                             <p className="text-sm text-amber-400">
                                 ⚠️ 프로젝트를 먼저 선택해주세요
@@ -315,10 +331,10 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                         {/* Running Job Output */}
                         {runningJob && (
                             <div className={`p-3 rounded-lg border ${runningJob.status === 'running'
-                                    ? 'bg-blue-500/10 border-blue-500/20'
-                                    : runningJob.status === 'completed'
-                                        ? 'bg-emerald-500/10 border-emerald-500/20'
-                                        : 'bg-red-500/10 border-red-500/20'
+                                ? 'bg-blue-500/10 border-blue-500/20'
+                                : runningJob.status === 'completed'
+                                    ? 'bg-emerald-500/10 border-emerald-500/20'
+                                    : 'bg-red-500/10 border-red-500/20'
                                 }`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
@@ -388,10 +404,10 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                         <div
                                             key={log.id}
                                             className={`p-3 rounded-lg border ${log.status === 'SUCCESS'
-                                                    ? 'bg-emerald-500/5 border-emerald-500/20'
-                                                    : log.status === 'FAILED'
-                                                        ? 'bg-red-500/5 border-red-500/20'
-                                                        : 'bg-[var(--bg-tertiary)] border-[var(--border-primary)]'
+                                                ? 'bg-emerald-500/5 border-emerald-500/20'
+                                                : log.status === 'FAILED'
+                                                    ? 'bg-red-500/5 border-red-500/20'
+                                                    : 'bg-[var(--bg-tertiary)] border-[var(--border-primary)]'
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2 text-sm">

@@ -48,7 +48,7 @@ export interface Ticket {
   id: string;
   title: string;
   description: string | null;
-  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETE' | 'ON_HOLD';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'NEED_FIX' | 'COMPLETE' | 'ON_HOLD';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   assignee_id: string | null;
   created_by: string | null;

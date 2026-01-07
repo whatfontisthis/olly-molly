@@ -56,6 +56,7 @@ const columns = [
     { id: 'TODO', title: 'To Do', color: 'text-[var(--text-secondary)]', icon: '📋' },
     { id: 'IN_PROGRESS', title: 'In Progress', color: 'text-blue-500', icon: '🔄' },
     { id: 'IN_REVIEW', title: 'In Review', color: 'text-purple-500', icon: '👀' },
+    { id: 'NEED_FIX', title: 'Need Fix', color: 'text-orange-500', icon: '🛠️' },
     { id: 'COMPLETE', title: 'Complete', color: 'text-emerald-500', icon: '✅' },
     { id: 'ON_HOLD', title: 'On Hold', color: 'text-amber-500', icon: '⏸️' },
 ];
