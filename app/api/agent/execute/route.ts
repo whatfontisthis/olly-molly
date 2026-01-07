@@ -18,6 +18,12 @@ function buildAgentPrompt(ticket: {
     name: string;
     path: string;
 }): string {
+    // Check if role is QA to add specific port instructions
+    const isQA = agent.role === 'QA';
+    const qaInstruction = isQA
+        ? `\nIMPORTANT: When running tests or starting servers, you MUST use port 3001 (or any port other than 1234) to avoid conflict with the main development server. For example, use "PORT=3001 npm run dev" or configure your test runner to target port 3001.`
+        : '';
+
     return `You are acting as ${agent.name} (${agent.role}) for the project "${project.name}".
 
 ${agent.system_prompt}
@@ -36,7 +42,7 @@ INSTRUCTIONS:
 3. Focus only on what's needed for this specific task
 4. Write clean, well-documented code
 5. After completing, provide a brief summary of changes made
-6. If you make changes, commit them with a meaningful message
+6. If you make changes, commit them with a meaningful message${qaInstruction}
 
 Please complete this task now.`;
 }
