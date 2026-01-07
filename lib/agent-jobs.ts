@@ -78,7 +78,7 @@ export function startBackgroundJob(params: StartJobParams): void {
 
     const claude = spawn(CLAUDE_PATH, args, {
         cwd: projectPath,
-        env: { ...process.env },
+        env: { ...process.env, PORT: '3001' },
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe'],
     });

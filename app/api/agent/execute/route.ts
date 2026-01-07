@@ -22,7 +22,7 @@ function buildAgentPrompt(ticket: {
     // Check if role is QA to add specific port instructions
     const isQA = agent.role === 'QA';
     const qaInstruction = isQA
-        ? `\nIMPORTANT: When running tests or starting servers, you MUST use port 3001 (or any port other than 1234) to avoid conflict with the main development server. For example, use "PORT=3001 npm run dev" or configure your test runner to target port 3001.`
+        ? `\nIMPORTANT: When running tests or starting servers for the TARGET PROJECT, you MUST use port 3001 (or any port other than 1234) to avoid conflict with this dashboard app. Use "PORT=3001 npm run dev" or equivalent.`
         : '';
 
     const feedbackSection = feedback
@@ -48,7 +48,8 @@ INSTRUCTIONS:
 3. Focus only on what's needed for this specific task
 4. Write clean, well-documented code
 5. After completing, provide a brief summary of changes made
-6. If you make changes, commit them with a meaningful message${qaInstruction}
+6. If you make changes, commit them with a meaningful message
+7. CRITICAL: You are working on the external project "${project.name}". When starting its server, ALWAYS use port 3001 (e.g. "PORT=3001 npm run dev"). NEVER use port 1234.${qaInstruction}
 
 Please complete this task now.`;
 }

@@ -37,7 +37,7 @@ export default function Dashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pmModalOpen, setPmModalOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
 
