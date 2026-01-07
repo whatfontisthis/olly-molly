@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -35,12 +35,21 @@ interface Ticket {
     assignee?: Member | null;
 }
 
+interface RunningJob {
+    id: string;
+    ticketId: string;
+    agentName: string;
+    status: 'running' | 'completed' | 'failed';
+}
+
 interface KanbanBoardProps {
     tickets: Ticket[];
     members: Member[];
     onTicketUpdate: (id: string, data: Partial<Ticket>) => void;
     onTicketCreate: (data: Partial<Ticket>) => void;
     onTicketDelete: (id: string) => void;
+    hasActiveProject?: boolean;
+    onRefresh?: () => void;
 }
 
 const columns = [
@@ -51,11 +60,12 @@ const columns = [
     { id: 'ON_HOLD', title: 'On Hold', color: 'text-amber-500', icon: '⏸️' },
 ];
 
-export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete }: KanbanBoardProps) {
+export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, hasActiveProject, onRefresh }: KanbanBoardProps) {
     const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -67,6 +77,33 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
             coordinateGetter: sortableKeyboardCoordinates,
         })
     );
+
+    // Poll for running jobs
+    useEffect(() => {
+        const fetchRunningJobs = async () => {
+            try {
+                const res = await fetch('/api/agent/status');
+                const data = await res.json();
+                setRunningJobs(data.jobs || []);
+
+                // If any job just completed, refresh the board
+                const hasCompleted = data.jobs?.some((job: RunningJob) => job.status !== 'running');
+                if (hasCompleted) {
+                    onRefresh?.();
+                }
+            } catch (error) {
+                console.error('Failed to fetch running jobs:', error);
+            }
+        };
+
+        fetchRunningJobs();
+        const interval = setInterval(fetchRunningJobs, 3000);
+        return () => clearInterval(interval);
+    }, [onRefresh]);
+
+    const isTicketRunning = useCallback((ticketId: string) => {
+        return runningJobs.some(job => job.ticketId === ticketId && job.status === 'running');
+    }, [runningJobs]);
 
     const handleDragStart = (event: DragStartEvent) => {
         const ticket = tickets.find(t => t.id === event.active.id);
@@ -120,12 +157,26 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
         }
     };
 
+    const handleTicketStatusChange = useCallback(() => {
+        onRefresh?.();
+    }, [onRefresh]);
+
+    const runningCount = runningJobs.filter(j => j.status === 'running').length;
+
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-[var(--text-primary)]">Kanban Board</h2>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-[var(--text-primary)]">Kanban Board</h2>
+                        {runningCount > 0 && (
+                            <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 text-blue-400 text-sm rounded-full">
+                                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                                {runningCount} agent{runningCount > 1 ? 's' : ''} working
+                            </span>
+                        )}
+                    </div>
                     <p className="text-sm text-[var(--text-tertiary)] mt-1">
                         Drag and drop tickets to change their status
                     </p>
@@ -155,13 +206,19 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
                             icon={column.icon}
                             tickets={tickets.filter(t => t.status === column.id)}
                             onTicketClick={handleTicketClick}
+                            runningTicketIds={runningJobs.filter(j => j.status === 'running').map(j => j.ticketId)}
                         />
                     ))}
                 </div>
 
                 <DragOverlay>
                     {activeTicket && (
-                        <TicketCard ticket={activeTicket} onClick={() => { }} isDragging />
+                        <TicketCard
+                            ticket={activeTicket}
+                            onClick={() => { }}
+                            isDragging
+                            isRunning={isTicketRunning(activeTicket.id)}
+                        />
                     )}
                 </DragOverlay>
             </DndContext>
@@ -174,6 +231,8 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
                 members={members}
                 onSave={handleModalSave}
                 onDelete={isCreating ? undefined : handleModalDelete}
+                hasActiveProject={hasActiveProject}
+                onTicketStatusChange={handleTicketStatusChange}
             />
         </div>
     );

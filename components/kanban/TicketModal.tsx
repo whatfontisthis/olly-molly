@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
-import { StatusBadge, PriorityBadge } from '@/components/ui/Badge';
-import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
 import { ActivityLog } from '@/components/activity/ActivityLog';
 
 interface Member {
@@ -29,6 +28,28 @@ interface Ticket {
     updated_at?: string;
 }
 
+interface WorkLog {
+    id: string;
+    status: string;
+    command: string;
+    output: string | null;
+    git_commit_hash: string | null;
+    started_at: string;
+    completed_at: string | null;
+    duration_ms: number | null;
+    agent_name?: string;
+    agent_avatar?: string;
+}
+
+interface RunningJob {
+    id: string;
+    ticketId: string;
+    agentName: string;
+    status: 'running' | 'completed' | 'failed';
+    output: string;
+    startedAt: string;
+}
+
 interface TicketModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -36,6 +57,8 @@ interface TicketModalProps {
     members: Member[];
     onSave: (data: Partial<Ticket>) => void;
     onDelete?: () => void;
+    hasActiveProject?: boolean;
+    onTicketStatusChange?: () => void;
 }
 
 const statusOptions = [
@@ -53,15 +76,87 @@ const priorityOptions = [
     { value: 'CRITICAL', label: 'Critical' },
 ];
 
-export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete }: TicketModalProps) {
+export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete, hasActiveProject, onTicketStatusChange }: TicketModalProps) {
     const [title, setTitle] = useState(ticket?.title || '');
     const [description, setDescription] = useState(ticket?.description || '');
     const [status, setStatus] = useState(ticket?.status || 'TODO');
     const [priority, setPriority] = useState(ticket?.priority || 'MEDIUM');
     const [assigneeId, setAssigneeId] = useState(ticket?.assignee_id || '');
     const [showLogs, setShowLogs] = useState(false);
+    const [showWorkLogs, setShowWorkLogs] = useState(false);
+    const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+    const [executing, setExecuting] = useState(false);
+    const [runningJob, setRunningJob] = useState<RunningJob | null>(null);
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const outputRef = useRef<HTMLPreElement>(null);
 
     const isEditing = !!ticket;
+
+    // Reset state when ticket changes
+    useEffect(() => {
+        if (ticket) {
+            setTitle(ticket.title);
+            setDescription(ticket.description || '');
+            setStatus(ticket.status);
+            setPriority(ticket.priority);
+            setAssigneeId(ticket.assignee_id || '');
+        }
+    }, [ticket]);
+
+    // Poll for job status when executing
+    useEffect(() => {
+        if (!ticket) return;
+
+        const checkJobStatus = async () => {
+            try {
+                const res = await fetch(`/api/agent/status?ticket_id=${ticket.id}`);
+                const data = await res.json();
+
+                if (data.job) {
+                    setRunningJob(data.job);
+                    setExecuting(data.job.status === 'running');
+
+                    // Auto-scroll output
+                    if (outputRef.current) {
+                        outputRef.current.scrollTop = outputRef.current.scrollHeight;
+                    }
+
+                    // If job completed, update status and stop polling
+                    if (data.job.status !== 'running') {
+                        setStatus(data.job.status === 'completed' ? 'IN_REVIEW' : status);
+                        onTicketStatusChange?.();
+                    }
+                } else {
+                    setRunningJob(null);
+                    setExecuting(false);
+                }
+            } catch (error) {
+                console.error('Failed to check job status:', error);
+            }
+        };
+
+        // Check immediately when modal opens or ticket changes
+        checkJobStatus();
+
+        // Poll every 2 seconds
+        pollIntervalRef.current = setInterval(checkJobStatus, 2000);
+
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+            }
+        };
+    }, [ticket, status, onTicketStatusChange]);
+
+    // Fetch work logs
+    useEffect(() => {
+        if (ticket && showWorkLogs) {
+            fetch(`/api/tickets/${ticket.id}/work-logs`)
+                .then(res => res.json())
+                .then(setWorkLogs)
+                .catch(console.error);
+        }
+    }, [ticket, showWorkLogs]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,17 +169,67 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
         });
     };
 
+    const handleExecuteAgent = async () => {
+        if (!ticket || !ticket.assignee_id) return;
+
+        setExecuting(true);
+
+        try {
+            const res = await fetch('/api/agent/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: ticket.id }),
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                setStatus('IN_PROGRESS');
+                // Job polling will pick up the running job
+            } else {
+                setExecuting(false);
+                alert(data.error || 'Failed to start agent');
+            }
+        } catch (error) {
+            setExecuting(false);
+            alert('Failed to start agent: ' + String(error));
+        }
+    };
+
+    const handleCancelJob = async () => {
+        if (!runningJob) return;
+
+        try {
+            await fetch(`/api/agent/status?job_id=${runningJob.id}`, { method: 'DELETE' });
+            setRunningJob(null);
+            setExecuting(false);
+        } catch (error) {
+            console.error('Failed to cancel job:', error);
+        }
+    };
+
     const memberOptions = [
         { value: '', label: 'Unassigned' },
         ...members.map(m => ({ value: m.id, label: `${m.avatar} ${m.name}` }))
     ];
+
+    const formatDuration = (ms: number) => {
+        if (ms < 1000) return `${ms}ms`;
+        if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+        return `${(ms / 60000).toFixed(1)}m`;
+    };
+
+    const getElapsedTime = (startedAt: string) => {
+        const elapsed = Date.now() - new Date(startedAt).getTime();
+        return formatDuration(elapsed);
+    };
 
     return (
         <Modal
             isOpen={isOpen}
             onClose={onClose}
             title={isEditing ? 'Edit Ticket' : 'Create Ticket'}
-            size="lg"
+            size="xl"
         >
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
@@ -125,19 +270,153 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                     options={memberOptions}
                 />
 
+                {/* Agent Execution Section */}
+                {isEditing && ticket && ticket.assignee_id && (
+                    <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">🤖</span>
+                                <span className="font-medium text-[var(--text-primary)]">AI Agent 실행</span>
+                                {executing && (
+                                    <Badge variant="info" size="sm">
+                                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-1" />
+                                        실행 중
+                                    </Badge>
+                                )}
+                            </div>
+                            {!executing ? (
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={handleExecuteAgent}
+                                    disabled={!hasActiveProject}
+                                >
+                                    🚀 Claude로 작업 실행
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={handleCancelJob}
+                                >
+                                    ⏹ 작업 취소
+                                </Button>
+                            )}
+                        </div>
+
+                        {!hasActiveProject && (
+                            <p className="text-sm text-amber-400">
+                                ⚠️ 프로젝트를 먼저 선택해주세요
+                            </p>
+                        )}
+
+                        {/* Running Job Output */}
+                        {runningJob && (
+                            <div className={`p-3 rounded-lg border ${runningJob.status === 'running'
+                                    ? 'bg-blue-500/10 border-blue-500/20'
+                                    : runningJob.status === 'completed'
+                                        ? 'bg-emerald-500/10 border-emerald-500/20'
+                                        : 'bg-red-500/10 border-red-500/20'
+                                }`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        {runningJob.status === 'running' ? (
+                                            <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                        ) : runningJob.status === 'completed' ? (
+                                            <span>✅</span>
+                                        ) : (
+                                            <span>❌</span>
+                                        )}
+                                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                                            {runningJob.agentName}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-[var(--text-muted)]">
+                                        {runningJob.status === 'running'
+                                            ? `⏱ ${getElapsedTime(runningJob.startedAt)}`
+                                            : runningJob.status === 'completed' ? '완료' : '실패'}
+                                    </span>
+                                </div>
+                                <pre
+                                    ref={outputRef}
+                                    className="text-xs text-[var(--text-tertiary)] max-h-48 overflow-auto whitespace-pre-wrap bg-black/20 rounded p-2"
+                                >
+                                    {runningJob.output || 'Starting...'}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {isEditing && ticket && (
-                    <div className="pt-4 border-t border-zinc-800">
-                        <button
-                            type="button"
-                            onClick={() => setShowLogs(!showLogs)}
-                            className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-                        >
-                            {showLogs ? 'Hide Activity Log' : 'Show Activity Log'}
-                        </button>
+                    <div className="pt-4 border-t border-[var(--border-primary)] space-y-3">
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => { setShowLogs(!showLogs); setShowWorkLogs(false); }}
+                                className={`text-sm transition-colors ${showLogs ? 'text-indigo-400' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                    }`}
+                            >
+                                📋 Activity Log
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setShowWorkLogs(!showWorkLogs); setShowLogs(false); }}
+                                className={`text-sm transition-colors ${showWorkLogs ? 'text-indigo-400' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                    }`}
+                            >
+                                🤖 Work Logs
+                            </button>
+                        </div>
 
                         {showLogs && (
-                            <div className="mt-4 max-h-48 overflow-y-auto">
+                            <div className="max-h-48 overflow-y-auto">
                                 <ActivityLog ticketId={ticket.id} />
+                            </div>
+                        )}
+
+                        {showWorkLogs && (
+                            <div className="max-h-48 overflow-y-auto space-y-2">
+                                {workLogs.length === 0 ? (
+                                    <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                                        아직 AI 작업 기록이 없습니다
+                                    </p>
+                                ) : (
+                                    workLogs.map((log) => (
+                                        <div
+                                            key={log.id}
+                                            className={`p-3 rounded-lg border ${log.status === 'SUCCESS'
+                                                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                                                    : log.status === 'FAILED'
+                                                        ? 'bg-red-500/5 border-red-500/20'
+                                                        : 'bg-[var(--bg-tertiary)] border-[var(--border-primary)]'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span>{log.status === 'SUCCESS' ? '✅' : log.status === 'FAILED' ? '❌' : '🔄'}</span>
+                                                <span className="text-[var(--text-primary)]">{log.agent_name || 'Agent'}</span>
+                                                {log.git_commit_hash && (
+                                                    <Badge variant="default" size="sm">
+                                                        {log.git_commit_hash.slice(0, 7)}
+                                                    </Badge>
+                                                )}
+                                                {log.duration_ms && (
+                                                    <span className="text-xs text-[var(--text-muted)]">
+                                                        {formatDuration(log.duration_ms)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {log.output && (
+                                                <pre className="mt-2 text-xs text-[var(--text-tertiary)] max-h-20 overflow-auto whitespace-pre-wrap">
+                                                    {log.output.slice(0, 500)}
+                                                    {log.output.length > 500 && '...'}
+                                                </pre>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
                     </div>

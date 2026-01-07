@@ -25,9 +25,10 @@ interface KanbanColumnProps {
     color: string;
     icon: string;
     onTicketClick: (ticket: Ticket) => void;
+    runningTicketIds?: string[];
 }
 
-export function KanbanColumn({ id, title, tickets, color, icon, onTicketClick }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, tickets, color, icon, onTicketClick, runningTicketIds = [] }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -54,7 +55,12 @@ export function KanbanColumn({ id, title, tickets, color, icon, onTicketClick }:
             <div className="flex-1 p-3 space-y-2 overflow-y-auto">
                 <SortableContext items={tickets.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     {tickets.map((ticket) => (
-                        <SortableTicket key={ticket.id} ticket={ticket} onTicketClick={onTicketClick} />
+                        <SortableTicket
+                            key={ticket.id}
+                            ticket={ticket}
+                            onTicketClick={onTicketClick}
+                            isRunning={runningTicketIds.includes(ticket.id)}
+                        />
                     ))}
                 </SortableContext>
 

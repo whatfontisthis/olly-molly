@@ -21,9 +21,10 @@ interface Ticket {
 interface SortableTicketProps {
     ticket: Ticket;
     onTicketClick: (ticket: Ticket) => void;
+    isRunning?: boolean;
 }
 
-export function SortableTicket({ ticket, onTicketClick }: SortableTicketProps) {
+export function SortableTicket({ ticket, onTicketClick, isRunning }: SortableTicketProps) {
     const {
         attributes,
         listeners,
@@ -49,6 +50,7 @@ export function SortableTicket({ ticket, onTicketClick }: SortableTicketProps) {
                 ticket={ticket}
                 onClick={() => !isDragging && onTicketClick(ticket)}
                 isDragging={isDragging}
+                isRunning={isRunning}
             />
         </div>
     );

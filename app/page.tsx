@@ -5,6 +5,7 @@ import { KanbanBoard } from '@/components/kanban';
 import { TeamPanel } from '@/components/team';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PMRequestModal } from '@/components/pm';
+import { ProjectSelector } from '@/components/project';
 import { Button } from '@/components/ui/Button';
 
 interface Member {
@@ -25,12 +26,20 @@ interface Ticket {
   assignee?: Member | null;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  path: string;
+  is_active: number;
+}
+
 export default function Dashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pmModalOpen, setPmModalOpen] = useState(false);
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -111,6 +120,10 @@ export default function Dashboard() {
     fetchData(); // Refresh all data
   }, [fetchData]);
 
+  const handleProjectChange = useCallback((project: Project | null) => {
+    setActiveProject(project);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
@@ -138,6 +151,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Project Selector */}
+            <ProjectSelector onProjectChange={handleProjectChange} />
             {/* PM Request Button */}
             <Button
               variant="secondary"
@@ -174,6 +189,8 @@ export default function Dashboard() {
             onTicketCreate={handleTicketCreate}
             onTicketUpdate={handleTicketUpdate}
             onTicketDelete={handleTicketDelete}
+            hasActiveProject={!!activeProject}
+            onRefresh={fetchData}
           />
         </main>
 

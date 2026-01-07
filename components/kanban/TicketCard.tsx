@@ -21,20 +21,25 @@ interface TicketCardProps {
     ticket: Ticket;
     onClick: () => void;
     isDragging?: boolean;
+    isRunning?: boolean;
 }
 
-export function TicketCard({ ticket, onClick, isDragging }: TicketCardProps) {
+export function TicketCard({ ticket, onClick, isDragging, isRunning }: TicketCardProps) {
     return (
         <div
             onClick={onClick}
             className={`
-        p-3 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)] cursor-pointer
+        p-3 bg-[var(--bg-card)] rounded-lg border cursor-pointer
         hover:border-[var(--border-secondary)] hover:bg-[var(--bg-card-hover)] transition-all duration-200
         ${isDragging ? 'opacity-50 scale-105 shadow-xl' : ''}
+        ${isRunning ? 'border-blue-500/50 ring-2 ring-blue-500/20' : 'border-[var(--border-primary)]'}
       `}
         >
             <div className="flex items-start gap-2 mb-2">
                 <h4 className="flex-1 text-sm font-medium text-[var(--text-primary)] line-clamp-2">
+                    {isRunning && (
+                        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1.5 align-middle" />
+                    )}
                     {ticket.title}
                 </h4>
                 <PriorityBadge priority={ticket.priority} />
@@ -55,7 +60,13 @@ export function TicketCard({ ticket, onClick, isDragging }: TicketCardProps) {
                                 emoji={ticket.assignee.avatar}
                                 size="sm"
                             />
-                            <span className="text-xs text-[var(--text-tertiary)]">{ticket.assignee.name}</span>
+                            <span className="text-xs text-[var(--text-tertiary)]">
+                                {isRunning ? (
+                                    <span className="text-blue-400">작업 중...</span>
+                                ) : (
+                                    ticket.assignee.name
+                                )}
+                            </span>
                         </>
                     ) : (
                         <span className="text-xs text-[var(--text-muted)] italic">Unassigned</span>
