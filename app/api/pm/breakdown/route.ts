@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
                 title: task.title,
                 description: task.description,
                 priority: task.priority,
-                assignee_id: assigneeId,
+                assignee_id: assigneeId || undefined,
                 created_by: pmMember?.id,
             });
 

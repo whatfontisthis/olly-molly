@@ -20,6 +20,7 @@ interface MemberCardProps {
     onClick: () => void;
 }
 
+
 export function MemberCard({ member, onClick }: MemberCardProps) {
     const roleLabels: Record<string, string> = {
         PM: 'Project Manager',
@@ -37,6 +38,14 @@ export function MemberCard({ member, onClick }: MemberCardProps) {
         DEVOPS: 'default',
     };
 
+    const roleImages: Record<string, string> = {
+        PM: '/profiles/pm.png',
+        FE_DEV: '/profiles/dev-frontend.png',
+        BACKEND_DEV: '/profiles/dev-backend.png',
+    };
+
+    const profileImage = roleImages[member.role];
+
     return (
         <div
             onClick={onClick}
@@ -45,7 +54,13 @@ export function MemberCard({ member, onClick }: MemberCardProps) {
                  cursor-pointer transition-all duration-200"
         >
             <div className="flex items-center gap-3">
-                <Avatar name={member.name} emoji={member.avatar} size="lg" />
+                <Avatar
+                    name={member.name}
+                    src={profileImage}
+                    emoji={!profileImage ? member.avatar : undefined}
+                    badge={profileImage ? member.avatar : undefined}
+                    size="lg"
+                />
                 <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-[var(--text-primary)] truncate">{member.name}</h3>
                     <Badge variant={roleColors[member.role]} size="sm">
@@ -67,8 +82,17 @@ interface SystemPromptEditorProps {
     onSave: (id: string, systemPrompt: string) => void;
 }
 
+
 export function SystemPromptEditor({ isOpen, onClose, member, onSave }: SystemPromptEditorProps) {
     const [prompt, setPrompt] = useState(member?.system_prompt || '');
+
+    const roleImages: Record<string, string> = {
+        PM: '/profiles/pm.png',
+        FE_DEV: '/profiles/dev-frontend.png',
+        BACKEND_DEV: '/profiles/dev-backend.png',
+    };
+
+    const profileImage = member ? roleImages[member.role] : undefined;
 
     const handleSave = () => {
         if (member) {
@@ -88,7 +112,13 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave }: SystemPr
                 <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
                     {member && (
                         <>
-                            <Avatar name={member.name} emoji={member.avatar} size="md" />
+                            <Avatar
+                                name={member.name}
+                                src={profileImage}
+                                emoji={!profileImage ? member.avatar : undefined}
+                                badge={profileImage ? member.avatar : undefined}
+                                size="md"
+                            />
                             <div>
                                 <p className="font-medium text-[var(--text-primary)]">{member.name}</p>
                                 <p className="text-xs text-[var(--text-tertiary)]">{member.role}</p>

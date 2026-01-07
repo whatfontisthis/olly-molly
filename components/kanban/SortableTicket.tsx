@@ -14,7 +14,8 @@ interface Ticket {
         id: string;
         name: string;
         avatar?: string | null;
-        role?: string;
+        role: string;
+        system_prompt: string;
     } | null;
 }
 

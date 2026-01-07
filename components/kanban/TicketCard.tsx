@@ -13,7 +13,8 @@ interface Ticket {
         id: string;
         name: string;
         avatar?: string | null;
-        role?: string;
+        role: string;
+        system_prompt: string;
     } | null;
 }
 
@@ -25,6 +26,14 @@ interface TicketCardProps {
 }
 
 export function TicketCard({ ticket, onClick, isDragging, isRunning }: TicketCardProps) {
+    const roleImages: Record<string, string> = {
+        PM: '/profiles/pm.png',
+        FE_DEV: '/profiles/dev-frontend.png',
+        BACKEND_DEV: '/profiles/dev-backend.png',
+    };
+
+    const profileImage = ticket.assignee ? roleImages[ticket.assignee.role] : undefined;
+
     return (
         <div
             onClick={onClick}
@@ -57,7 +66,9 @@ export function TicketCard({ ticket, onClick, isDragging, isRunning }: TicketCar
                         <>
                             <Avatar
                                 name={ticket.assignee.name}
-                                emoji={ticket.assignee.avatar}
+                                src={profileImage}
+                                emoji={!profileImage ? ticket.assignee.avatar : undefined}
+                                badge={profileImage ? ticket.assignee.avatar : undefined}
                                 size="sm"
                             />
                             <span className="text-xs text-[var(--text-tertiary)]">
