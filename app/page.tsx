@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { KanbanBoard } from '@/components/kanban';
 import { TeamPanel } from '@/components/team';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PMRequestModal } from '@/components/pm';
+import { Button } from '@/components/ui/Button';
 
 interface Member {
   id: string;
@@ -28,29 +30,31 @@ export default function Dashboard() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pmModalOpen, setPmModalOpen] = useState(false);
 
   // Fetch data
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [membersRes, ticketsRes] = await Promise.all([
-          fetch('/api/members'),
-          fetch('/api/tickets'),
-        ]);
-        const [membersData, ticketsData] = await Promise.all([
-          membersRes.json(),
-          ticketsRes.json(),
-        ]);
-        setMembers(membersData);
-        setTickets(ticketsData);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
-      }
+  const fetchData = useCallback(async () => {
+    try {
+      const [membersRes, ticketsRes] = await Promise.all([
+        fetch('/api/members'),
+        fetch('/api/tickets'),
+      ]);
+      const [membersData, ticketsData] = await Promise.all([
+        membersRes.json(),
+        ticketsRes.json(),
+      ]);
+      setMembers(membersData);
+      setTickets(ticketsData);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleTicketCreate = useCallback(async (data: Partial<Ticket>) => {
     try {
@@ -103,6 +107,10 @@ export default function Dashboard() {
     }
   }, []);
 
+  const handlePMTicketsCreated = useCallback(() => {
+    fetchData(); // Refresh all data
+  }, [fetchData]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
@@ -130,6 +138,16 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* PM Request Button */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPmModalOpen(true)}
+              className="gap-2"
+            >
+              <span>👔</span>
+              PM에게 요청
+            </Button>
             <ThemeToggle />
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -168,6 +186,13 @@ export default function Dashboard() {
           <TeamPanel members={members} onUpdateMember={handleMemberUpdate} />
         </aside>
       </div>
+
+      {/* PM Request Modal */}
+      <PMRequestModal
+        isOpen={pmModalOpen}
+        onClose={() => setPmModalOpen(false)}
+        onTicketsCreated={handlePMTicketsCreated}
+      />
     </div>
   );
 }
