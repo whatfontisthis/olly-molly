@@ -92,6 +92,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     const [runningJob, setRunningJob] = useState<RunningJob | null>(null);
     const [feedback, setFeedback] = useState('');
     const [provider, setProvider] = useState<AgentProvider>('claude');
+    const [expandedLog, setExpandedLog] = useState(false);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const outputRef = useRef<HTMLPreElement>(null);
 
@@ -143,8 +144,8 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
         // Check immediately when modal opens or ticket changes
         checkJobStatus();
 
-        // Poll every 2 seconds
-        pollIntervalRef.current = setInterval(checkJobStatus, 2000);
+        // Poll every 500ms for real-time log updates
+        pollIntervalRef.current = setInterval(checkJobStatus, 500);
 
         return () => {
             if (pollIntervalRef.current) {
@@ -324,8 +325,8 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     onClick={() => setProvider('claude')}
                                     disabled={executing}
                                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'claude'
-                                            ? 'bg-indigo-500 text-white'
-                                            : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                        ? 'bg-indigo-500 text-white'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                                         } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     🟣 Claude
@@ -335,8 +336,8 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     onClick={() => setProvider('opencode')}
                                     disabled={executing}
                                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'opencode'
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                                         } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     🟢 OpenCode
@@ -363,7 +364,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
 
                         {/* Running Job Output */}
                         {runningJob && (
-                            <div className={`p-3 rounded-lg border ${runningJob.status === 'running'
+                            <div className={`p-3 rounded-lg border transition-all ${runningJob.status === 'running'
                                 ? 'bg-blue-500/10 border-blue-500/20'
                                 : runningJob.status === 'completed'
                                     ? 'bg-emerald-500/10 border-emerald-500/20'
@@ -381,19 +382,37 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                         <span className="text-sm font-medium text-[var(--text-primary)]">
                                             {runningJob.agentName}
                                         </span>
+                                        <Badge variant="default" size="sm">
+                                            {runningJob.output.split('\n').length} lines
+                                        </Badge>
                                     </div>
-                                    <span className="text-xs text-[var(--text-muted)]">
-                                        {runningJob.status === 'running'
-                                            ? `⏱ ${getElapsedTime(runningJob.startedAt)}`
-                                            : runningJob.status === 'completed' ? '완료' : '실패'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-[var(--text-muted)]">
+                                            {runningJob.status === 'running'
+                                                ? `⏱ ${getElapsedTime(runningJob.startedAt)}`
+                                                : runningJob.status === 'completed' ? '완료' : '실패'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExpandedLog(!expandedLog)}
+                                            className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                                        >
+                                            {expandedLog ? '🔽 축소' : '🔼 확대'}
+                                        </button>
+                                    </div>
                                 </div>
                                 <pre
                                     ref={outputRef}
-                                    className="text-xs text-[var(--text-tertiary)] max-h-48 overflow-auto whitespace-pre-wrap bg-black/20 rounded p-2"
+                                    className={`text-xs text-[var(--text-tertiary)] overflow-auto whitespace-pre-wrap bg-black/30 rounded p-3 font-mono transition-all ${expandedLog ? 'max-h-[60vh]' : 'max-h-48'}`}
                                 >
                                     {runningJob.output || 'Starting...'}
                                 </pre>
+                                {runningJob.status === 'running' && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-blue-400">
+                                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                                        실시간 로그 스트리밍 중...
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
