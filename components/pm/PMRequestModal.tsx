@@ -23,9 +23,10 @@ interface PMRequestModalProps {
     isOpen: boolean;
     onClose: () => void;
     onTicketsCreated: () => void;
+    projectId?: string;
 }
 
-export function PMRequestModal({ isOpen, onClose, onTicketsCreated }: PMRequestModalProps) {
+export function PMRequestModal({ isOpen, onClose, onTicketsCreated, projectId }: PMRequestModalProps) {
     const [request, setRequest] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,10 @@ export function PMRequestModal({ isOpen, onClose, onTicketsCreated }: PMRequestM
             const res = await fetch('/api/pm/breakdown', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ request: request.trim() }),
+                body: JSON.stringify({
+                    request: request.trim(),
+                    project_id: projectId,
+                }),
             });
 
             const data = await res.json();

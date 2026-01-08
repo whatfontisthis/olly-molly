@@ -42,11 +42,14 @@ export default function Dashboard() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
 
   // Fetch data
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (projectId?: string) => {
     try {
+      const ticketUrl = projectId
+        ? `/api/tickets?projectId=${projectId}`
+        : '/api/tickets';
       const [membersRes, ticketsRes] = await Promise.all([
         fetch('/api/members'),
-        fetch('/api/tickets'),
+        fetch(ticketUrl),
       ]);
       const [membersData, ticketsData] = await Promise.all([
         membersRes.json(),
@@ -62,22 +65,25 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(activeProject?.id);
+  }, [fetchData, activeProject]);
 
   const handleTicketCreate = useCallback(async (data: Partial<Ticket>) => {
     try {
       const res = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          project_id: activeProject?.id,
+        }),
       });
       const newTicket = await res.json();
       setTickets(prev => [newTicket, ...prev]);
     } catch (error) {
       console.error('Failed to create ticket:', error);
     }
-  }, []);
+  }, [activeProject]);
 
   const handleTicketUpdate = useCallback(async (id: string, data: Partial<Ticket>) => {
     try {
@@ -117,8 +123,8 @@ export default function Dashboard() {
   }, []);
 
   const handlePMTicketsCreated = useCallback(() => {
-    fetchData(); // Refresh all data
-  }, [fetchData]);
+    fetchData(activeProject?.id); // Refresh all data for current project
+  }, [fetchData, activeProject]);
 
   const handleProjectChange = useCallback((project: Project | null) => {
     setActiveProject(project);
@@ -209,6 +215,7 @@ export default function Dashboard() {
         isOpen={pmModalOpen}
         onClose={() => setPmModalOpen(false)}
         onTicketsCreated={handlePMTicketsCreated}
+        projectId={activeProject?.id}
       />
     </div>
   );

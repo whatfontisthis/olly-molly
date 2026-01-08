@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
                 description: task.description,
                 priority: task.priority,
                 assignee_id: assigneeId || undefined,
+                project_id: body.project_id,
                 created_by: pmMember?.id,
             });
 

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   status TEXT DEFAULT 'TODO' CHECK(status IN ('TODO', 'IN_PROGRESS', 'IN_REVIEW', 'NEED_FIX', 'COMPLETE', 'ON_HOLD')),
   priority TEXT DEFAULT 'MEDIUM' CHECK(priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
   assignee_id TEXT REFERENCES members(id),
+  project_id TEXT REFERENCES projects(id),
   created_by TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets(project_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_ticket ON activity_logs(ticket_id);
 
 -- Insert default team members

@@ -51,6 +51,7 @@ export interface Ticket {
   status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'NEED_FIX' | 'COMPLETE' | 'ON_HOLD';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   assignee_id: string | null;
+  project_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -146,29 +147,31 @@ export const memberService = {
 
 // Ticket operations
 export const ticketService = {
-  getAll(status?: string): Ticket[] {
+  getAll(status?: string, projectId?: string): Ticket[] {
     let query = `
       SELECT t.*, m.name as assignee_name, m.avatar as assignee_avatar, m.role as assignee_role
       FROM tickets t
       LEFT JOIN members m ON t.assignee_id = m.id
     `;
+    const conditions: string[] = [];
+    const params: (string | null)[] = [];
 
     if (status) {
-      query += ' WHERE t.status = ?';
-      const tickets = db.prepare(query).all(status) as (Ticket & { assignee_name?: string; assignee_avatar?: string; assignee_role?: string })[];
-      return tickets.map(t => ({
-        ...t,
-        assignee: t.assignee_id ? {
-          id: t.assignee_id,
-          name: t.assignee_name!,
-          avatar: t.assignee_avatar!,
-          role: t.assignee_role as Member['role']
-        } as Member : undefined
-      }));
+      conditions.push('t.status = ?');
+      params.push(status);
+    }
+
+    if (projectId) {
+      conditions.push('t.project_id = ?');
+      params.push(projectId);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY t.created_at DESC';
-    const tickets = db.prepare(query).all() as (Ticket & { assignee_name?: string; assignee_avatar?: string; assignee_role?: string })[];
+    const tickets = db.prepare(query).all(...params) as (Ticket & { assignee_name?: string; assignee_avatar?: string; assignee_role?: string })[];
     return tickets.map(t => ({
       ...t,
       assignee: t.assignee_id ? {
@@ -201,12 +204,12 @@ export const ticketService = {
     };
   },
 
-  create(data: { title: string; description?: string; priority?: Ticket['priority']; assignee_id?: string; created_by?: string }): Ticket {
+  create(data: { title: string; description?: string; priority?: Ticket['priority']; assignee_id?: string; project_id?: string; created_by?: string }): Ticket {
     const id = uuidv4();
     db.prepare(`
-      INSERT INTO tickets (id, title, description, priority, assignee_id, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, data.title, data.description || null, data.priority || 'MEDIUM', data.assignee_id || null, data.created_by || null);
+      INSERT INTO tickets (id, title, description, priority, assignee_id, project_id, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, data.title, data.description || null, data.priority || 'MEDIUM', data.assignee_id || null, data.project_id || null, data.created_by || null);
 
     // Log creation
     activityService.log({
