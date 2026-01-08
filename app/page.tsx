@@ -130,6 +130,10 @@ export default function Dashboard() {
     setActiveProject(project);
   }, []);
 
+  const handleRefresh = useCallback(() => {
+    fetchData(activeProject?.id);
+  }, [fetchData, activeProject]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
@@ -196,7 +200,7 @@ export default function Dashboard() {
             onTicketUpdate={handleTicketUpdate}
             onTicketDelete={handleTicketDelete}
             hasActiveProject={!!activeProject}
-            onRefresh={fetchData}
+            onRefresh={handleRefresh}
           />
         </main>
 
