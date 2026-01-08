@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ticketService, memberService, projectService, activityService, agentWorkLogService } from '@/lib/db';
-import { startBackgroundJob } from '@/lib/agent-jobs';
+import { startBackgroundJob, AgentProvider } from '@/lib/agent-jobs';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AgentExecuteRequest {
     ticket_id: string;
     feedback?: string;
+    provider?: AgentProvider;
 }
 
 function buildAgentPrompt(ticket: {
@@ -89,6 +90,9 @@ export async function POST(request: NextRequest) {
         // Build prompt
         const prompt = buildAgentPrompt(ticket, agent, project, body.feedback);
 
+        // Use provided provider or default to 'claude'
+        const provider: AgentProvider = body.provider || 'claude';
+
         // Generate job ID
         const jobId = uuidv4();
 
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
             ticket_id: body.ticket_id,
             agent_id: agent.id,
             project_id: project.id,
-            command: `claude --print --dangerously-skip-permissions`,
+            command: provider === 'opencode' ? 'opencode run' : 'claude --print --dangerously-skip-permissions',
             prompt,
         });
 
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
             ticket_id: body.ticket_id,
             member_id: agent.id,
             action: 'AGENT_WORK_STARTED',
-            details: `${agent.name} started working on this task using Claude Code`,
+            details: `${agent.name} started working on this task using ${provider === 'opencode' ? 'OpenCode' : 'Claude Code'}`,
         });
 
         // Start background job (non-blocking)
@@ -121,6 +125,7 @@ export async function POST(request: NextRequest) {
             agentName: agent.name,
             projectPath: project.path,
             prompt,
+            provider,
         });
 
         // Return immediately with job info

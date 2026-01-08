@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { ActivityLog } from '@/components/activity/ActivityLog';
+import type { AgentProvider } from '@/lib/agent-jobs';
 
 interface Member {
     id: string;
@@ -90,6 +91,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     const [executing, setExecuting] = useState(false);
     const [runningJob, setRunningJob] = useState<RunningJob | null>(null);
     const [feedback, setFeedback] = useState('');
+    const [provider, setProvider] = useState<AgentProvider>('claude');
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const outputRef = useRef<HTMLPreElement>(null);
 
@@ -183,7 +185,8 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ticket_id: ticket.id,
-                    feedback: feedback.trim() || undefined
+                    feedback: feedback.trim() || undefined,
+                    provider,
                 }),
             });
 
@@ -298,7 +301,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     onClick={handleExecuteAgent}
                                     disabled={!hasActiveProject}
                                 >
-                                    {status === 'NEED_FIX' ? '🔁 피드백 반영 및 재시도' : '🚀 Claude로 작업 실행'}
+                                    {status === 'NEED_FIX' ? '🔁 피드백 반영 및 재시도' : `🚀 ${provider === 'opencode' ? 'OpenCode' : 'Claude'}로 작업 실행`}
                                 </Button>
                             ) : (
                                 <Button
@@ -310,6 +313,35 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     ⏹ 작업 취소
                                 </Button>
                             )}
+                        </div>
+
+                        {/* Provider Selection */}
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm text-[var(--text-tertiary)]">Agent Provider:</label>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setProvider('claude')}
+                                    disabled={executing}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'claude'
+                                            ? 'bg-indigo-500 text-white'
+                                            : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                        } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    🟣 Claude
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setProvider('opencode')}
+                                    disabled={executing}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'opencode'
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                        } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    🟢 OpenCode
+                                </button>
+                            </div>
                         </div>
 
                         {/* Feedback Input */}

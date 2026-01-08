@@ -1,7 +1,10 @@
 import { spawn, ChildProcess } from 'child_process';
 import { agentWorkLogService, activityService, ticketService } from './db';
 
+export type AgentProvider = 'claude' | 'opencode';
+
 const CLAUDE_PATH = '/opt/homebrew/bin/claude';
+const OPENCODE_PATH = '/opt/homebrew/bin/opencode';
 
 interface RunningJob {
     id: string;
@@ -10,6 +13,7 @@ interface RunningJob {
     agentId: string;
     agentName: string;
     projectPath: string;
+    provider: AgentProvider;
     startedAt: Date;
     process: ChildProcess;
     output: string;
@@ -27,6 +31,7 @@ export function getRunningJobs(): Omit<RunningJob, 'process'>[] {
         agentId: job.agentId,
         agentName: job.agentName,
         projectPath: job.projectPath,
+        provider: job.provider,
         startedAt: job.startedAt,
         output: job.output,
         status: job.status,
@@ -43,6 +48,7 @@ export function getJobByTicketId(ticketId: string): Omit<RunningJob, 'process'> 
                 agentId: job.agentId,
                 agentName: job.agentName,
                 projectPath: job.projectPath,
+                provider: job.provider,
                 startedAt: job.startedAt,
                 output: job.output,
                 status: job.status,
@@ -65,18 +71,28 @@ interface StartJobParams {
     agentName: string;
     projectPath: string;
     prompt: string;
+    provider: AgentProvider;
 }
 
 export function startBackgroundJob(params: StartJobParams): void {
-    const { jobId, workLogId, ticketId, agentId, agentName, projectPath, prompt } = params;
+    const { jobId, workLogId, ticketId, agentId, agentName, projectPath, prompt, provider } = params;
 
-    const args = [
-        '--print',
-        '--dangerously-skip-permissions',
-        prompt
-    ];
+    // Configure command and args based on provider
+    let execPath: string;
+    let args: string[];
+    let startMessage: string;
 
-    const claude = spawn(CLAUDE_PATH, args, {
+    if (provider === 'opencode') {
+        execPath = OPENCODE_PATH;
+        args = ['run', prompt];
+        startMessage = `🚀 Starting OpenCode in ${projectPath}...\n\n`;
+    } else {
+        execPath = CLAUDE_PATH;
+        args = ['--print', '--dangerously-skip-permissions', prompt];
+        startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
+    }
+
+    const agentProcess = spawn(execPath, args, {
         cwd: projectPath,
         env: { ...process.env, PORT: '3001' },
         detached: false,
@@ -90,27 +106,28 @@ export function startBackgroundJob(params: StartJobParams): void {
         agentId,
         agentName,
         projectPath,
+        provider,
         startedAt: new Date(),
-        process: claude,
-        output: `🚀 Starting Claude Code in ${projectPath}...\n\n`,
+        process: agentProcess,
+        output: startMessage,
         status: 'running',
     };
 
     runningJobs.set(jobId, job);
 
     // Capture stdout
-    claude.stdout?.on('data', (data: Buffer) => {
+    agentProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString('utf-8');
         job.output += text;
     });
 
     // Capture stderr
-    claude.stderr?.on('data', (data: Buffer) => {
+    agentProcess.stderr?.on('data', (data: Buffer) => {
         const text = data.toString('utf-8');
         job.output += `[stderr] ${text}\n`;
     });
 
-    claude.on('close', (code) => {
+    agentProcess.on('close', (code: number | null) => {
         const success = code === 0;
         job.status = success ? 'completed' : 'failed';
 
@@ -147,7 +164,7 @@ export function startBackgroundJob(params: StartJobParams): void {
         }, 60000); // Keep completed job info for 1 minute
     });
 
-    claude.on('error', (error) => {
+    agentProcess.on('error', (error: Error) => {
         job.status = 'failed';
         job.output += `\n[error] ${error.message}`;
 
