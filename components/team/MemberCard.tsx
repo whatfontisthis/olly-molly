@@ -42,6 +42,7 @@ export function MemberCard({ member, onClick }: MemberCardProps) {
         PM: '/profiles/pm.png',
         FE_DEV: '/profiles/dev-frontend.png',
         BACKEND_DEV: '/profiles/dev-backend.png',
+        QA: '/profiles/qa.png',
     };
 
     const profileImage = roleImages[member.role];
@@ -90,6 +91,7 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave }: SystemPr
         PM: '/profiles/pm.png',
         FE_DEV: '/profiles/dev-frontend.png',
         BACKEND_DEV: '/profiles/dev-backend.png',
+        QA: '/profiles/qa.png',
     };
 
     const profileImage = member ? roleImages[member.role] : undefined;

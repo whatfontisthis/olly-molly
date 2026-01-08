@@ -30,6 +30,7 @@ export function TicketCard({ ticket, onClick, isDragging, isRunning }: TicketCar
         PM: '/profiles/pm.png',
         FE_DEV: '/profiles/dev-frontend.png',
         BACKEND_DEV: '/profiles/dev-backend.png',
+        QA: '/profiles/qa.png',
     };
 
     const profileImage = ticket.assignee ? roleImages[ticket.assignee.role] : undefined;
