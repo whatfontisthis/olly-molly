@@ -91,7 +91,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     const [executing, setExecuting] = useState(false);
     const [runningJob, setRunningJob] = useState<RunningJob | null>(null);
     const [feedback, setFeedback] = useState('');
-    const [provider, setProvider] = useState<AgentProvider>('claude');
+    const [provider, setProvider] = useState<AgentProvider>('opencode');
     const [expandedLog, setExpandedLog] = useState(false);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const outputRef = useRef<HTMLPreElement>(null);
