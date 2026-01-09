@@ -10,13 +10,16 @@ interface RouteParams {
 // GET /api/conversations/[id]
 export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
-        const conversation = conversationService.getById(params.id);
+        // Await params for Next.js 15+
+        const { id } = await params;
+
+        const conversation = conversationService.getById(id);
 
         if (!conversation) {
             return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        const messages = conversationMessageService.getByConversationId(params.id);
+        const messages = conversationMessageService.getByConversationId(id);
 
         return NextResponse.json({
             conversation,
