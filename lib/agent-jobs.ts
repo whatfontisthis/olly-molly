@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
-import { agentWorkLogService, activityService, ticketService } from './db';
+import { conversationService, conversationMessageService, activityService, ticketService } from './db';
 
 export type AgentProvider = 'claude' | 'opencode';
 
@@ -8,7 +8,7 @@ const OPENCODE_PATH = '/opt/homebrew/bin/opencode';
 
 interface RunningJob {
     id: string;
-    workLogId: string;
+    conversationId: string;
     ticketId: string;
     agentId: string;
     agentName: string;
@@ -26,7 +26,7 @@ const runningJobs = new Map<string, RunningJob>();
 export function getRunningJobs(): Omit<RunningJob, 'process'>[] {
     return Array.from(runningJobs.values()).map(job => ({
         id: job.id,
-        workLogId: job.workLogId,
+        conversationId: job.conversationId,
         ticketId: job.ticketId,
         agentId: job.agentId,
         agentName: job.agentName,
@@ -43,7 +43,7 @@ export function getJobByTicketId(ticketId: string): Omit<RunningJob, 'process'> 
         if (job.ticketId === ticketId) {
             return {
                 id: job.id,
-                workLogId: job.workLogId,
+                conversationId: job.conversationId,
                 ticketId: job.ticketId,
                 agentId: job.agentId,
                 agentName: job.agentName,
@@ -65,7 +65,7 @@ export function getJobOutput(jobId: string): string | null {
 
 interface StartJobParams {
     jobId: string;
-    workLogId: string;
+    conversationId: string;
     ticketId: string;
     agentId: string;
     agentName: string;
@@ -75,7 +75,7 @@ interface StartJobParams {
 }
 
 export function startBackgroundJob(params: StartJobParams): void {
-    const { jobId, workLogId, ticketId, agentId, agentName, projectPath, prompt, provider } = params;
+    const { jobId, conversationId, ticketId, agentId, agentName, projectPath, prompt, provider } = params;
 
     // Configure command and args based on provider
     let execPath: string;
@@ -101,7 +101,7 @@ export function startBackgroundJob(params: StartJobParams): void {
 
     const job: RunningJob = {
         id: jobId,
-        workLogId,
+        conversationId,
         ticketId,
         agentId,
         agentName,
@@ -115,16 +115,24 @@ export function startBackgroundJob(params: StartJobParams): void {
 
     runningJobs.set(jobId, job);
 
+    // Log start message to conversation
+    conversationMessageService.create(conversationId, startMessage, 'system');
+
     // Capture stdout
     agentProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString('utf-8');
         job.output += text;
+        // Save to conversation messages
+        conversationMessageService.create(conversationId, text, 'log');
     });
 
     // Capture stderr
     agentProcess.stderr?.on('data', (data: Buffer) => {
         const text = data.toString('utf-8');
-        job.output += `[stderr] ${text}\n`;
+        const errorText = `[stderr] ${text}\n`;
+        job.output += errorText;
+        // Save errors to conversation messages
+        conversationMessageService.create(conversationId, text, 'error');
     });
 
     agentProcess.on('close', (code: number | null) => {
@@ -135,12 +143,17 @@ export function startBackgroundJob(params: StartJobParams): void {
         const commitMatch = job.output.match(/commit\s+([a-f0-9]{7,40})/i);
         const commitHash = commitMatch ? commitMatch[1] : undefined;
 
-        // Update work log
-        agentWorkLogService.complete(workLogId, {
-            status: success ? 'SUCCESS' : 'FAILED',
-            output: job.output.slice(0, 50000),
+        // Update conversation status
+        conversationService.complete(conversationId, {
+            status: success ? 'completed' : 'failed',
             git_commit_hash: commitHash,
         });
+
+        // Add completion message
+        const completionMessage = success
+            ? `✅ Task completed successfully${commitHash ? ` (commit: ${commitHash})` : ''}`
+            : '❌ Task failed';
+        conversationMessageService.create(conversationId, completionMessage, success ? 'success' : 'error');
 
         // Log activity
         activityService.log({
@@ -168,10 +181,13 @@ export function startBackgroundJob(params: StartJobParams): void {
         job.status = 'failed';
         job.output += `\n[error] ${error.message}`;
 
-        agentWorkLogService.complete(workLogId, {
-            status: 'FAILED',
-            output: job.output,
+        // Update conversation
+        conversationService.complete(conversationId, {
+            status: 'failed',
         });
+
+        // Add error message
+        conversationMessageService.create(conversationId, `❌ Process error: ${error.message}`, 'error');
 
         activityService.log({
             ticket_id: ticketId,
@@ -196,10 +212,13 @@ export function cancelJob(jobId: string): boolean {
     job.status = 'failed';
     job.output += '\n[cancelled] Job was cancelled by user';
 
-    agentWorkLogService.complete(job.workLogId, {
-        status: 'CANCELLED',
-        output: job.output,
+    // Update conversation
+    conversationService.complete(job.conversationId, {
+        status: 'cancelled',
     });
+
+    // Add cancellation message
+    conversationMessageService.create(job.conversationId, '⏹ Job was cancelled by user', 'system');
 
     activityService.log({
         ticket_id: job.ticketId,

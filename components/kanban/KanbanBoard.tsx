@@ -15,7 +15,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
 import { TicketCard } from './TicketCard';
-import { TicketModal } from './TicketModal';
+import { TicketSidebar } from './TicketSidebar';
 import { Button } from '@/components/ui/Button';
 
 interface Member {
@@ -65,8 +65,7 @@ const columns = [
 export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, hasActiveProject, onRefresh }: KanbanBoardProps) {
     const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isCreating, setIsCreating] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
     const sensors = useSensors(
@@ -133,30 +132,22 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
 
     const handleTicketClick = useCallback((ticket: Ticket) => {
         setSelectedTicket(ticket);
-        setIsCreating(false);
-        setIsModalOpen(true);
+        setIsSidebarOpen(true);
     }, []);
 
     const handleCreateClick = () => {
+        // For now, creating tickets still uses inline approach or can be added to sidebar
+        // We'll create a minimal ticket and open sidebar
+        onTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
+    };
+
+    const handleSidebarClose = () => {
+        setIsSidebarOpen(false);
         setSelectedTicket(null);
-        setIsCreating(true);
-        setIsModalOpen(true);
     };
 
-    const handleModalSave = (data: Partial<Ticket>) => {
-        if (isCreating) {
-            onTicketCreate(data);
-        } else if (selectedTicket) {
-            onTicketUpdate(selectedTicket.id, data);
-        }
-        setIsModalOpen(false);
-    };
-
-    const handleModalDelete = () => {
-        if (selectedTicket) {
-            onTicketDelete(selectedTicket.id);
-            setIsModalOpen(false);
-        }
+    const handleTicketUpdate = (id: string, data: Partial<Ticket>) => {
+        onTicketUpdate(id, data);
     };
 
     const handleTicketStatusChange = useCallback(() => {
@@ -225,16 +216,15 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
                 </DragOverlay>
             </DndContext>
 
-            {/* Modal */}
-            <TicketModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                ticket={isCreating ? null : selectedTicket}
+            {/* Sidebar */}
+            <TicketSidebar
+                isOpen={isSidebarOpen}
+                onClose={handleSidebarClose}
+                ticket={selectedTicket}
                 members={members}
-                onSave={handleModalSave}
-                onDelete={isCreating ? undefined : handleModalDelete}
+                onTicketUpdate={handleTicketUpdate}
+                onTicketDelete={onTicketDelete}
                 hasActiveProject={hasActiveProject}
-                onTicketStatusChange={handleTicketStatusChange}
             />
         </div>
     );

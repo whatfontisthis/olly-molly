@@ -207,7 +207,7 @@ export default function Dashboard() {
         {/* Team Sidebar */}
         <aside className={`
           fixed right-0 top-[73px] bottom-0 w-80 bg-secondary border-l border-primary
-          p-4 transition-transform duration-300 overflow-hidden
+          p-4 transition-transform duration-300 overflow-hidden z-20
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
           <TeamPanel members={members} onUpdateMember={handleMemberUpdate} />

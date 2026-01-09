@@ -28,6 +28,13 @@ function initializeDatabase() {
     const projectsSchema = fs.readFileSync(projectsSchemaPath, 'utf-8');
     db.exec(projectsSchema);
   }
+
+  // Load conversations schema if exists
+  const conversationsSchemaPath = path.join(process.cwd(), 'db', 'schema-conversations.sql');
+  if (fs.existsSync(conversationsSchemaPath)) {
+    const conversationsSchema = fs.readFileSync(conversationsSchemaPath, 'utf-8');
+    db.exec(conversationsSchema);
+  }
 }
 
 // Initialize on first load
@@ -93,6 +100,29 @@ export interface AgentWorkLog {
   started_at: string;
   completed_at: string | null;
   duration_ms: number | null;
+}
+
+export interface Conversation {
+  id: string;
+  ticket_id: string;
+  agent_id: string;
+  provider: 'claude' | 'opencode';
+  prompt: string | null;
+  feedback: string | null;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  git_commit_hash: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  agent?: Member;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  content: string;
+  message_type: 'log' | 'error' | 'success' | 'system';
+  created_at: string;
 }
 
 // Member operations
@@ -422,6 +452,112 @@ export const agentWorkLogService = {
     `).run(data.status, data.output || null, data.git_commit_hash || null, duration, id);
 
     return this.getById(id);
+  }
+};
+
+// Conversation operations
+export const conversationService = {
+  create(data: {
+    ticket_id: string;
+    agent_id: string;
+    provider: 'claude' | 'opencode';
+    prompt?: string;
+    feedback?: string;
+  }): Conversation {
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO conversations (id, ticket_id, agent_id, provider, prompt, feedback)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, data.ticket_id, data.agent_id, data.provider, data.prompt || null, data.feedback || null);
+    return this.getById(id)!;
+  },
+
+  getById(id: string): Conversation | undefined {
+    const conversation = db.prepare(`
+      SELECT c.*, m.name as agent_name, m.avatar as agent_avatar, m.role as agent_role
+      FROM conversations c
+      LEFT JOIN members m ON c.agent_id = m.id
+      WHERE c.id = ?
+    `).get(id) as (Conversation & { agent_name?: string; agent_avatar?: string; agent_role?: string }) | undefined;
+
+    if (!conversation) return undefined;
+
+    return {
+      ...conversation,
+      agent: conversation.agent_id ? {
+        id: conversation.agent_id,
+        name: conversation.agent_name!,
+        avatar: conversation.agent_avatar!,
+        role: conversation.agent_role as Member['role']
+      } as Member : undefined
+    };
+  },
+
+  getByTicketId(ticketId: string): Conversation[] {
+    const conversations = db.prepare(`
+      SELECT c.*, m.name as agent_name, m.avatar as agent_avatar, m.role as agent_role
+      FROM conversations c
+      LEFT JOIN members m ON c.agent_id = m.id
+      WHERE c.ticket_id = ?
+      ORDER BY c.started_at DESC
+    `).all(ticketId) as (Conversation & { agent_name?: string; agent_avatar?: string; agent_role?: string })[];
+
+    return conversations.map(conv => ({
+      ...conv,
+      agent: conv.agent_id ? {
+        id: conv.agent_id,
+        name: conv.agent_name!,
+        avatar: conv.agent_avatar!,
+        role: conv.agent_role as Member['role']
+      } as Member : undefined
+    }));
+  },
+
+  updateStatus(id: string, status: Conversation['status'], commitHash?: string): void {
+    db.prepare(`
+      UPDATE conversations 
+      SET status = ?, git_commit_hash = ?
+      WHERE id = ?
+    `).run(status, commitHash || null, id);
+  },
+
+  complete(id: string, data: {
+    status: Conversation['status'];
+    git_commit_hash?: string;
+  }): void {
+    db.prepare(`
+      UPDATE conversations 
+      SET status = ?, git_commit_hash = ?, completed_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(data.status, data.git_commit_hash || null, id);
+  }
+};
+
+// Conversation message operations
+export const conversationMessageService = {
+  create(conversationId: string, content: string, type: ConversationMessage['message_type'] = 'log'): ConversationMessage {
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO conversation_messages (id, conversation_id, content, message_type)
+      VALUES (?, ?, ?, ?)
+    `).run(id, conversationId, content, type);
+    return this.getById(id)!;
+  },
+
+  getById(id: string): ConversationMessage | undefined {
+    return db.prepare('SELECT * FROM conversation_messages WHERE id = ?').get(id) as ConversationMessage | undefined;
+  },
+
+  getByConversationId(conversationId: string): ConversationMessage[] {
+    return db.prepare(`
+      SELECT * FROM conversation_messages 
+      WHERE conversation_id = ? 
+      ORDER BY created_at ASC
+    `).all(conversationId) as ConversationMessage[];
+  },
+
+  appendLog(conversationId: string, content: string): void {
+    this.create(conversationId, content, 'log');
   }
 };
 

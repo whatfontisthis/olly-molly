@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ticketService, memberService, projectService, activityService, agentWorkLogService } from '@/lib/db';
+import { ticketService, memberService, projectService, activityService, conversationService } from '@/lib/db';
 import { startBackgroundJob, AgentProvider } from '@/lib/agent-jobs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -99,13 +99,13 @@ export async function POST(request: NextRequest) {
         // Update ticket status to IN_PROGRESS
         ticketService.update(body.ticket_id, { status: 'IN_PROGRESS' }, agent.id);
 
-        // Log the work start
-        const workLog = agentWorkLogService.create({
+        // Create conversation for this execution
+        const conversation = conversationService.create({
             ticket_id: body.ticket_id,
             agent_id: agent.id,
-            project_id: project.id,
-            command: provider === 'opencode' ? 'opencode run' : 'claude --print --dangerously-skip-permissions',
+            provider,
             prompt,
+            feedback: body.feedback,
         });
 
         // Log activity
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         // Start background job (non-blocking)
         startBackgroundJob({
             jobId,
-            workLogId: workLog.id,
+            conversationId: conversation.id,
             ticketId: body.ticket_id,
             agentId: agent.id,
             agentName: agent.name,
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             job_id: jobId,
-            work_log_id: workLog.id,
+            conversation_id: conversation.id,
             message: `${agent.name} started working on the task. The job is running in the background.`,
             agent: {
                 id: agent.id,
