@@ -111,7 +111,7 @@ brew install anthropics/tap/claude-code
 **Windows:**
 ```bash
 # OpenCode (via npm)
-npm install -g opencode
+npm install -g opencode-ai
 
 # Claude CLI (via npm)
 npm install -g @anthropic-ai/claude-code

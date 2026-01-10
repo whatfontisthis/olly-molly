@@ -33,7 +33,7 @@ export function CLIWarningModal({ isOpen, onClose }: CLIWarningModalProps) {
             claude: 'brew install anthropics/tap/claude-code',
         },
         windows: {
-            opencode: 'npm install -g opencode',
+            opencode: 'npm install -g opencode-ai',
             claude: 'npm install -g @anthropic-ai/claude-code',
         },
     };
@@ -58,8 +58,8 @@ export function CLIWarningModal({ isOpen, onClose }: CLIWarningModalProps) {
                     <button
                         onClick={() => setPlatform('mac')}
                         className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-all ${platform === 'mac'
-                                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                            ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                             }`}
                     >
                         🍎 macOS
@@ -67,8 +67,8 @@ export function CLIWarningModal({ isOpen, onClose }: CLIWarningModalProps) {
                     <button
                         onClick={() => setPlatform('windows')}
                         className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-all ${platform === 'windows'
-                                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                            ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                             }`}
                     >
                         🪟 Windows
