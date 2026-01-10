@@ -60,6 +60,9 @@ function runMigrations() {
     // SQLite doesn't support ALTER CHECK constraint, so we need to recreate the table
     // First, check if the old constraint exists by trying to insert and catching error
     try {
+      // Disable foreign key checks temporarily
+      db.exec('PRAGMA foreign_keys = OFF;');
+
       db.exec(`
         -- Create new table with updated CHECK constraint
         CREATE TABLE IF NOT EXISTS members_new (
@@ -83,8 +86,14 @@ function runMigrations() {
         -- Rename new table
         ALTER TABLE members_new RENAME TO members;
       `);
+
+      // Re-enable foreign key checks
+      db.exec('PRAGMA foreign_keys = ON;');
+
       console.log('Migration: Recreated members table with BUG_HUNTER support');
     } catch (e) {
+      // Make sure foreign keys are re-enabled even on error
+      try { db.exec('PRAGMA foreign_keys = ON;'); } catch { /* ignore */ }
       console.log('Migration: Table recreation skipped or already done:', e);
     }
 
