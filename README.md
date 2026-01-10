@@ -1,36 +1,182 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<p align="center">
+  <img src="app-icon.png" width="80" height="80" alt="Olly Molly">
+</p>
 
-## Getting Started
+<h1 align="center">Olly Molly</h1>
 
-First, run the development server:
+<p align="center">
+  <strong>Your AI Development Team, Running Locally</strong>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#contributing">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/npm/v/olly-molly?style=flat-square" alt="npm version">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="license">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs welcome">
+</p>
+
+---
+
+**Olly Molly** is a local-first AI development team manager. Assign tasks to AI agents (PM, Frontend, Backend, QA) and watch them work on your codebase—all from a beautiful kanban board interface.
+
+## Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx olly-molly
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+That's it. Open `http://localhost:1234` and start managing your AI team.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- 🎯 **Kanban Board** — Drag-and-drop task management
+- 🤖 **AI Agents** — PM, Frontend Dev, Backend Dev, QA agents
+- 💬 **Natural Requests** — Ask PM in plain language, get structured tickets
+- 🔒 **Local-First** — Everything runs on your machine
+- 🎨 **Minimal Design** — Clean, paper-like UI inspired by fontshare.com
+- 🌙 **Dark Mode** — Easy on the eyes
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Olly Molly                         │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  You ──▶ PM Agent ──▶ Creates Tickets                  │
+│              │                                          │
+│              ▼                                          │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  TODO  │  PROGRESS  │  REVIEW  │  DONE  │ HOLD  │   │
+│  │   📋   │     🔄     │    👀    │   ✅   │  ⏸️   │   │
+│  └─────────────────────────────────────────────────┘   │
+│              │                                          │
+│              ▼                                          │
+│  Agents (FE/BE/QA) work on assigned tickets            │
+│              │                                          │
+│              ▼                                          │
+│  Code changes in YOUR local project                    │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Prerequisites
 
-## Deploy on Vercel
+- Node.js 18+
+- OpenAI API key (or compatible provider)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Run with npx (Recommended)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx olly-molly
+```
+
+### Or install globally
+
+```bash
+npm install -g olly-molly
+olly-molly
+```
+
+### Development
+
+```bash
+git clone https://github.com/YOUR_USERNAME/olly-molly.git
+cd olly-molly
+npm install
+npm run dev
+```
+
+## Configuration
+
+On first launch, you'll be prompted to enter your OpenAI API key. This is stored locally in your browser's localStorage.
+
+You can also set it via environment variable:
+
+```bash
+export OPENAI_API_KEY=your-key-here
+npx olly-molly
+```
+
+## Project Selection
+
+1. Click "Select Project" in the header
+2. Add your project path (e.g., `/Users/you/my-app`)
+3. AI agents will work within that directory
+
+## Contributing
+
+We love contributions! Here's how you can help:
+
+### Ways to Contribute
+
+- 🐛 **Bug Reports** — Found a bug? Open an issue
+- 💡 **Feature Requests** — Have an idea? Let's discuss
+- 🔧 **Pull Requests** — Code contributions are welcome
+- 📖 **Documentation** — Help improve our docs
+- 🎨 **Design** — UI/UX improvements
+
+### Development Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/olly-molly.git
+cd olly-molly
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Open http://localhost:1234
+```
+
+### Project Structure
+
+```
+olly-molly/
+├── app/                 # Next.js app router
+│   ├── api/            # API routes
+│   ├── design-system/  # Design system docs
+│   └── page.tsx        # Main dashboard
+├── components/         # React components
+│   ├── kanban/        # Kanban board
+│   ├── ui/            # Reusable UI components
+│   └── ...
+├── db/                 # SQLite schemas
+└── lib/               # Utilities
+```
+
+### Code Style
+
+- TypeScript for type safety
+- Functional components with hooks
+- CSS variables for theming
+- Minimal dependencies
+
+## Tech Stack
+
+- **Framework**: Next.js 16
+- **UI**: React 19, Tailwind CSS 4
+- **Database**: SQLite (better-sqlite3)
+- **Drag & Drop**: dnd-kit
+- **AI**: OpenAI API
+
+## License
+
+MIT © [Your Name]
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for developers who love AI</sub>
+</p>
