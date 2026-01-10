@@ -10,8 +10,32 @@ const APP_NAME = 'olly-molly';
 const REPO = 'ruucm/olly-molly';
 const APP_DIR = path.join(os.homedir(), '.olly-molly');
 const TARBALL_URL = `https://github.com/${REPO}/archive/refs/heads/main.tar.gz`;
+const VERSION_URL = `https://raw.githubusercontent.com/${REPO}/main/package.json`;
 
 console.log('\n🐙 Olly Molly - Your AI Development Team\n');
+
+function fetchJSON(url) {
+    return new Promise((resolve, reject) => {
+        const get = (downloadUrl) => {
+            https.get(downloadUrl, (res) => {
+                if (res.statusCode === 302 || res.statusCode === 301) {
+                    get(res.headers.location);
+                    return;
+                }
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch {
+                        reject(new Error('Invalid JSON'));
+                    }
+                });
+            }).on('error', reject);
+        };
+        get(url);
+    });
+}
 
 function downloadAndExtract(url, destDir) {
     return new Promise((resolve, reject) => {
@@ -22,33 +46,23 @@ function downloadAndExtract(url, destDir) {
         
         const download = (downloadUrl) => {
             https.get(downloadUrl, (response) => {
-                // Handle redirects
                 if (response.statusCode === 302 || response.statusCode === 301) {
                     download(response.headers.location);
                     return;
                 }
-                
                 if (response.statusCode !== 200) {
                     reject(new Error(`Download failed: ${response.statusCode}`));
                     return;
                 }
-                
                 response.pipe(file);
                 file.on('finish', () => {
                     file.close();
-                    
                     console.log('📦 Extracting...');
-                    
-                    // Create dest directory
                     if (!fs.existsSync(destDir)) {
                         fs.mkdirSync(destDir, { recursive: true });
                     }
-                    
-                    // Extract tarball
                     try {
-                        execSync(`tar -xzf "${tempFile}" -C "${destDir}" --strip-components=1`, {
-                            stdio: 'pipe'
-                        });
+                        execSync(`tar -xzf "${tempFile}" -C "${destDir}" --strip-components=1`, { stdio: 'pipe' });
                         fs.unlinkSync(tempFile);
                         resolve();
                     } catch (err) {
@@ -57,94 +71,78 @@ function downloadAndExtract(url, destDir) {
                 });
             }).on('error', reject);
         };
-        
         download(url);
     });
 }
 
-async function main() {
-    const args = process.argv.slice(2);
-    
-    // Update flag
-    if (args.includes('--update') || args.includes('-u')) {
-        console.log('🔄 Updating Olly Molly...\n');
-        if (fs.existsSync(APP_DIR)) {
-            fs.rmSync(APP_DIR, { recursive: true, force: true });
-        }
+async function getLocalVersion() {
+    const pkgPath = path.join(APP_DIR, 'package.json');
+    if (!fs.existsSync(pkgPath)) return null;
+    try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        return pkg.version;
+    } catch {
+        return null;
     }
-    
-    // Download if not exists
-    if (!fs.existsSync(APP_DIR)) {
-        console.log('📦 First run - downloading Olly Molly...\n');
-        try {
-            await downloadAndExtract(TARBALL_URL, APP_DIR);
-            console.log('✅ Downloaded!\n');
-        } catch (error) {
-            console.error('❌ Download failed:', error.message);
-            console.error('\n   Make sure the repository is public at:');
-            console.error(`   https://github.com/${REPO}\n`);
-            process.exit(1);
-        }
-    }
-    
-    // Install dependencies if needed
-    const nodeModulesPath = path.join(APP_DIR, 'node_modules');
-    if (!fs.existsSync(nodeModulesPath)) {
-        console.log('📦 Installing dependencies (first time only)...\n');
-        try {
-            execSync('npm install --production', { 
-                cwd: APP_DIR, 
-                stdio: 'inherit' 
-            });
-        } catch (error) {
-            console.error('❌ Failed to install dependencies');
-            process.exit(1);
-        }
-    }
-    
-    // Build if needed
-    const nextPath = path.join(APP_DIR, '.next');
-    if (!fs.existsSync(nextPath)) {
-        console.log('🔨 Building app (first time only)...\n');
-        try {
-            execSync('npm run build', { 
-                cwd: APP_DIR, 
-                stdio: 'inherit' 
-            });
-        } catch (error) {
-            console.error('❌ Failed to build');
-            process.exit(1);
-        }
-    }
-    
-    console.log('\n🚀 Starting on http://localhost:1234\n');
-    console.log('   Press Ctrl+C to stop');
-    console.log('   Run "npx olly-molly -u" to update\n');
-    
-    // Start the server using npx next directly
-    const server = spawn('npx', ['next', 'start', '--port', '1234'], {
-        cwd: APP_DIR,
-        stdio: 'inherit'
-    });
-    
-    server.on('error', (error) => {
-        console.error('❌ Failed to start:', error.message);
-        process.exit(1);
-    });
-    
-    server.on('close', (code) => {
-        process.exit(code || 0);
-    });
-    
-    // Graceful shutdown
-    process.on('SIGINT', () => {
-        console.log('\n👋 Bye!');
-        server.kill('SIGINT');
-    });
-    
-    process.on('SIGTERM', () => {
-        server.kill('SIGTERM');
-    });
 }
 
-main().catch(console.error);
+async function main() {
+    try {
+        // Check remote version
+        let remoteVersion = null;
+        try {
+            const remotePkg = await fetchJSON(VERSION_URL);
+            remoteVersion = remotePkg.version;
+        } catch {
+            // Offline or error - continue with local
+        }
+
+        const localVersion = await getLocalVersion();
+        
+        // Auto-update if versions differ
+        if (localVersion && remoteVersion && localVersion !== remoteVersion) {
+            console.log(`🔄 New version available: ${localVersion} → ${remoteVersion}\n`);
+            console.log('   Updating...\n');
+            fs.rmSync(APP_DIR, { recursive: true, force: true });
+        }
+
+        // Download if not exists
+        if (!fs.existsSync(APP_DIR)) {
+            console.log('📦 Downloading Olly Molly...\n');
+            await downloadAndExtract(TARBALL_URL, APP_DIR);
+            console.log('✅ Downloaded!\n');
+        }
+
+        // Install dependencies if needed
+        const nodeModulesPath = path.join(APP_DIR, 'node_modules');
+        if (!fs.existsSync(nodeModulesPath)) {
+            console.log('📦 Installing dependencies...\n');
+            execSync('npm install --omit=dev', { cwd: APP_DIR, stdio: 'inherit' });
+        }
+
+        // Build if needed
+        const nextPath = path.join(APP_DIR, '.next');
+        if (!fs.existsSync(nextPath)) {
+            console.log('🔨 Building (first time only)...\n');
+            execSync('npm run build', { cwd: APP_DIR, stdio: 'inherit' });
+        }
+
+        console.log('\n🚀 http://localhost:1234\n');
+
+        // Start server
+        const server = spawn('npx', ['next', 'start', '--port', '1234'], {
+            cwd: APP_DIR,
+            stdio: 'inherit'
+        });
+
+        server.on('close', (code) => process.exit(code || 0));
+        process.on('SIGINT', () => { server.kill('SIGINT'); });
+        process.on('SIGTERM', () => { server.kill('SIGTERM'); });
+
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+        process.exit(1);
+    }
+}
+
+main();
