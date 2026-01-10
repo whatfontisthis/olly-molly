@@ -15,7 +15,6 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
 import { TicketCard } from './TicketCard';
-import { Button } from '@/components/ui/Button';
 
 interface Member {
     id: string;
@@ -141,31 +140,7 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
     const runningCount = runningJobs.filter(j => j.status === 'running').length;
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-[var(--text-primary)]">Kanban Board</h2>
-                        {runningCount > 0 && (
-                            <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 text-blue-400 text-sm rounded-full">
-                                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                                {runningCount} agent{runningCount > 1 ? 's' : ''} working
-                            </span>
-                        )}
-                    </div>
-                    <p className="text-sm text-[var(--text-tertiary)] mt-1">
-                        Drag and drop tickets to change their status
-                    </p>
-                </div>
-                <Button onClick={handleCreateClick} variant="primary">
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    New Ticket
-                </Button>
-            </div>
-
+        <div className="flex h-full border-t border-[var(--border-primary)]">
             {/* Board */}
             <DndContext
                 sensors={sensors}

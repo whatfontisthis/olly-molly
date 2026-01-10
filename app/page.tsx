@@ -11,6 +11,12 @@ import { Button } from '@/components/ui/Button';
 import { ResizablePane } from '@/components/ui/ResizablePane';
 import { ApiKeyModal } from '@/components/ui/ApiKeyModal';
 
+interface RunningJob {
+  id: string;
+  ticketId: string;
+  agentName: string;
+  status: 'running' | 'completed' | 'failed';
+}
 interface Member {
   id: string;
   role: string;
@@ -46,6 +52,7 @@ export default function Dashboard() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
   // Check for API key on mount
   useEffect(() => {
@@ -64,6 +71,22 @@ export default function Dashboard() {
           setApiKeyModalOpen(true);
         });
     }
+  }, []);
+
+  // Poll for running jobs
+  useEffect(() => {
+    const fetchRunningJobs = async () => {
+      try {
+        const res = await fetch('/api/agent/status');
+        const data = await res.json();
+        setRunningJobs(data.jobs || []);
+      } catch (error) {
+        console.error('Failed to fetch running jobs:', error);
+      }
+    };
+    fetchRunningJobs();
+    const interval = setInterval(fetchRunningJobs, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch data
@@ -164,55 +187,67 @@ export default function Dashboard() {
     setApiKeyModalOpen(false);
   };
 
+  const handleCreateTicket = () => {
+    handleTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
+  };
+
+  const runningCount = runningJobs.filter(j => j.status === 'running').length;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-primary flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-tertiary">Loading Olly Molly...</p>
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-[var(--text-primary)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-[var(--text-muted)]">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-primary">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-primary/80 backdrop-blur-xl border-b border-primary">
-        <div className="px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
+        <div className="px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image
               src="/app-icon.png"
               alt="Olly Molly"
-              width={40}
-              height={40}
-              className="rounded-xl"
+              width={28}
+              height={28}
+              className="opacity-80"
             />
-            <div>
-              <h1 className="text-xl font-bold text-primary">Olly Molly</h1>
-              <p className="text-xs text-muted">Manage your AI development team</p>
-            </div>
+            <h1 className="text-sm font-medium text-[var(--text-primary)]">Olly Molly</h1>
+            {runningCount > 0 && (
+              <span className="flex items-center gap-1.5 text-xs text-[var(--status-progress-text)]">
+                <span className="w-1.5 h-1.5 bg-[var(--status-progress-text)] rounded-full gentle-pulse" />
+                {runningCount} working
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Project Selector */}
             <ProjectSelector onProjectChange={handleProjectChange} />
-            {/* PM Request Button */}
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => setPmModalOpen(true)}
-              className="gap-2"
             >
-              <span>👔</span>
-              PM에게 요청
+              PM 요청
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleCreateTicket}
+            >
+              + New
             </Button>
             <ThemeToggle />
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 text-tertiary hover:text-primary hover:bg-tertiary rounded-lg transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round"
                   d={sidebarOpen
                     ? "M11 19l-7-7 7-7m8 14l-7-7 7-7"
                     : "M13 5l7 7-7 7M5 5l7 7-7 7"} />
@@ -223,13 +258,13 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-73px)]">
+      <div className="flex h-[calc(100vh-45px)]">
         <ResizablePane
           defaultLeftWidth={ticketSidebarOpen ? 55 : 100}
           minLeftWidth={30}
           minRightWidth={25}
           left={
-            <div className="p-6 h-full overflow-auto">
+            <div className="h-full overflow-auto">
               <KanbanBoard
                 tickets={tickets}
                 members={members}
@@ -269,8 +304,8 @@ export default function Dashboard() {
 
         {/* Team Sidebar */}
         <aside className={`
-          fixed right-0 top-[73px] bottom-0 w-80 bg-secondary border-l border-primary
-          p-4 transition-transform duration-300 overflow-hidden z-20
+          fixed right-0 top-[45px] bottom-0 w-72 bg-[var(--bg-secondary)] border-l border-[var(--border-primary)]
+          p-4 transition-transform duration-200 overflow-hidden z-20
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
           <TeamPanel members={members} onUpdateMember={handleMemberUpdate} />
