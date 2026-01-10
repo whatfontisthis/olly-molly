@@ -15,6 +15,7 @@ if (!fs.existsSync(dbDir)) {
 // Create database connection
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000'); // Wait up to 5 seconds for locks
 
 // Initialize database schema
 function initializeDatabase() {
