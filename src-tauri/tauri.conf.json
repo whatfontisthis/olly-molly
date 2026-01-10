@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "AI Dev Team",
+  "productName": "Olly Molly",
   "version": "0.1.0",
-  "identifier": "com.aidevteam.desktop",
+  "identifier": "com.ollymolly.desktop",
   "build": {
     "devUrl": "http://localhost:1234",
     "beforeDevCommand": "npm run dev",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "AI Dev Team",
+        "title": "Olly Molly",
         "width": 1400,
         "height": 900,
         "minWidth": 800,

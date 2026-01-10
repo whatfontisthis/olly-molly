@@ -2,7 +2,7 @@
 set -e
 
 echo "========================================"
-echo "AI Dev Team - Tauri Build Script"
+echo "Olly Molly - Tauri Build Script"
 echo "========================================"
 
 # Step 1: Build Next.js standalone
@@ -44,7 +44,7 @@ npm run tauri:build || true
 # Step 4: Add server to app bundle (use rsync for hidden files)
 echo ""
 echo "Step 4: Adding server to app bundle..."
-APP_PATH="src-tauri/target/release/bundle/macos/AI Dev Team.app"
+APP_PATH="src-tauri/target/release/bundle/macos/Olly Molly.app"
 mkdir -p "$APP_PATH/Contents/Resources/server"
 # Use rsync to properly copy hidden files like .next
 rsync -a src-tauri/server/ "$APP_PATH/Contents/Resources/server/"
@@ -60,9 +60,9 @@ fi
 # Step 5: Create DMG
 echo ""
 echo "Step 5: Creating DMG..."
-DMG_PATH="src-tauri/target/release/bundle/AI Dev Team_0.1.0_aarch64.dmg"
+DMG_PATH="src-tauri/target/release/bundle/olly-molly_0.1.0_aarch64.dmg"
 rm -f "$DMG_PATH"
-hdiutil create -volname "AI Dev Team" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+hdiutil create -volname "Olly Molly" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
 
 echo ""
 echo "========================================"

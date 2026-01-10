@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { KanbanBoard, TicketSidebar } from '@/components/kanban';
 import { TeamPanel } from '@/components/team';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -168,7 +169,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-primary flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-tertiary">Loading AI Dev Team...</p>
+          <p className="text-tertiary">Loading Olly Molly...</p>
         </div>
       </div>
     );
@@ -180,12 +181,15 @@ export default function Dashboard() {
       <header className="sticky top-0 z-40 bg-primary/80 backdrop-blur-xl border-b border-primary">
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 
-                            flex items-center justify-center text-xl">
-              🤖
-            </div>
+            <Image
+              src="/app-icon.png"
+              alt="Olly Molly"
+              width={40}
+              height={40}
+              className="rounded-xl"
+            />
             <div>
-              <h1 className="text-xl font-bold text-primary">AI Dev Team</h1>
+              <h1 className="text-xl font-bold text-primary">Olly Molly</h1>
               <p className="text-xs text-muted">Manage your AI development team</p>
             </div>
           </div>

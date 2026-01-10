@@ -1,7 +1,7 @@
 [package]
-name = "ai-dev-team"
+name = "olly-molly"
 version = "0.1.0"
-description = "AI Dev Team - Local AI Development Assistant"
+description = "Olly Molly - Local AI Development Assistant"
 authors = ["you"]
 license = "MIT"
 repository = ""

@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Dev Team",
-  description: "Manage your AI development team with Kanban board",
+  title: "Olly Molly",
+  description: "Manage your AI development team with Olly Molly",
 };
 
 export default function RootLayout({

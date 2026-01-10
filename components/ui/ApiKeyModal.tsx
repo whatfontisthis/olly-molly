@@ -45,7 +45,7 @@ export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
                             <li>Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">platform.openai.com/api-keys</a></li>
                             <li>Sign in or create an OpenAI account</li>
                             <li>Click "Create new secret key"</li>
-                            <li>Give it a name (e.g., "AI Dev Team")</li>
+                            <li>Give it a name (e.g., "Olly Molly")</li>
                             <li>Copy the key (starts with "sk-")</li>
                             <li>Paste it below</li>
                         </ol>
