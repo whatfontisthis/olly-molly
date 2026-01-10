@@ -121,11 +121,10 @@ async function main() {
     console.log('   Press Ctrl+C to stop');
     console.log('   Run "npx olly-molly -u" to update\n');
     
-    // Start the server
-    const server = spawn('npm', ['run', 'start', '--', '--port', '1234'], {
+    // Start the server using npx next directly
+    const server = spawn('npx', ['next', 'start', '--port', '1234'], {
         cwd: APP_DIR,
-        stdio: 'inherit',
-        shell: true
+        stdio: 'inherit'
     });
     
     server.on('error', (error) => {
