@@ -13,7 +13,7 @@ export function Select({ label, value, onChange, options, placeholder, className
     return (
         <div className="w-full">
             {label && (
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                     {label}
                 </label>
             )}
@@ -21,12 +21,13 @@ export function Select({ label, value, onChange, options, placeholder, className
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 className={`
-          w-full px-4 py-2.5 rounded-lg border bg-[var(--bg-tertiary)] text-[var(--text-primary)]
-          transition-all duration-200 cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-          border-[var(--border-primary)] hover:border-[var(--border-secondary)]
-          ${className}
-        `}
+                    w-full px-3 py-2 text-sm
+                    bg-transparent text-[var(--text-primary)]
+                    border-b border-[var(--border-primary)]
+                    transition-colors duration-150 cursor-pointer
+                    focus:outline-none focus:border-[var(--text-primary)]
+                    ${className}
+                `}
             >
                 {placeholder && (
                     <option value="" disabled className="text-[var(--text-muted)]">
@@ -34,7 +35,7 @@ export function Select({ label, value, onChange, options, placeholder, className
                     </option>
                 )}
                 {options.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-[var(--bg-secondary)]">
+                    <option key={option.value} value={option.value} className="bg-[var(--bg-card)]">
                         {option.label}
                     </option>
                 ))}

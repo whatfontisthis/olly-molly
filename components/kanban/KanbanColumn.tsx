@@ -36,24 +36,28 @@ export function KanbanColumn({ id, title, tickets, color, icon, onTicketClick, r
         <div
             ref={setNodeRef}
             className={`
-        flex-1 min-w-[280px] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]
-        flex flex-col max-h-[calc(100vh-200px)]
-        ${isOver ? 'border-indigo-500/50 bg-indigo-500/5' : ''}
-      `}
+                flex-1 min-w-[260px]
+                flex flex-col max-h-[calc(100vh-180px)]
+                border-r border-[var(--border-primary)] last:border-r-0
+                transition-colors duration-150
+                ${isOver ? 'bg-[var(--bg-secondary)]' : 'bg-transparent'}
+            `}
         >
             {/* Column Header */}
-            <div className="p-4 border-b border-[var(--border-primary)]">
+            <div className="px-4 py-3 border-b border-[var(--border-primary)]">
                 <div className="flex items-center gap-2">
-                    <span className="text-lg">{icon}</span>
-                    <h3 className={`font-semibold ${color}`}>{title}</h3>
-                    <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] rounded-full">
+                    <span className="text-sm">{icon}</span>
+                    <h3 className={`text-xs font-medium uppercase tracking-wider ${color}`}>
+                        {title}
+                    </h3>
+                    <span className="ml-auto text-xs text-[var(--text-muted)]">
                         {tickets.length}
                     </span>
                 </div>
             </div>
 
             {/* Tickets */}
-            <div className="flex-1 p-3 space-y-2 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto">
                 <SortableContext items={tickets.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     {tickets.map((ticket) => (
                         <SortableTicket
@@ -66,7 +70,7 @@ export function KanbanColumn({ id, title, tickets, color, icon, onTicketClick, r
                 </SortableContext>
 
                 {tickets.length === 0 && (
-                    <div className="flex items-center justify-center py-8 text-[var(--text-muted)] text-sm">
+                    <div className="flex items-center justify-center py-12 text-[var(--text-muted)] text-xs">
                         No tickets
                     </div>
                 )}

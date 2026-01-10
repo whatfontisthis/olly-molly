@@ -1,7 +1,7 @@
 'use client';
 
 import { Avatar } from '@/components/ui/Avatar';
-import { StatusBadge, PriorityBadge } from '@/components/ui/Badge';
+import { PriorityBadge } from '@/components/ui/Badge';
 
 interface Ticket {
     id: string;
@@ -39,52 +39,59 @@ export function TicketCard({ ticket, onClick, isDragging, isRunning }: TicketCar
         <div
             onClick={onClick}
             className={`
-        p-3 bg-[var(--bg-card)] rounded-lg border cursor-pointer
-        hover:border-[var(--border-secondary)] hover:bg-[var(--bg-card-hover)] transition-all duration-200
-        ${isDragging ? 'opacity-50 scale-105 shadow-xl' : ''}
-        ${isRunning ? 'border-blue-500/50 ring-2 ring-blue-500/20' : 'border-[var(--border-primary)]'}
-      `}
+                px-4 py-3 border-b border-[var(--border-primary)] cursor-pointer
+                transition-colors duration-150
+                hover:bg-[var(--bg-secondary)]
+                ${isDragging ? 'opacity-50 bg-[var(--bg-secondary)]' : ''}
+                ${isRunning ? 'bg-[var(--status-progress)]/30' : ''}
+            `}
         >
-            <div className="flex items-start gap-2 mb-2">
-                <h4 className="flex-1 text-sm font-medium text-[var(--text-primary)] line-clamp-2">
-                    {isRunning && (
-                        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1.5 align-middle" />
-                    )}
-                    {ticket.title}
-                </h4>
-                <PriorityBadge priority={ticket.priority} />
-            </div>
-
-            {ticket.description && (
-                <p className="text-xs text-[var(--text-tertiary)] mb-3 line-clamp-2">
-                    {ticket.description}
-                </p>
-            )}
-
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="flex items-start gap-3">
+                {/* Left: Assignee Avatar */}
+                <div className="flex-shrink-0 pt-0.5">
                     {ticket.assignee ? (
-                        <>
-                            <Avatar
-                                name={ticket.assignee.name}
-                                src={profileImage}
-                                emoji={!profileImage ? ticket.assignee.avatar : undefined}
-                                badge={profileImage ? ticket.assignee.avatar : undefined}
-                                size="sm"
-                            />
-                            <span className="text-xs text-[var(--text-tertiary)]">
-                                {isRunning ? (
-                                    <span className="text-blue-400">작업 중...</span>
-                                ) : (
-                                    ticket.assignee.name
-                                )}
-                            </span>
-                        </>
+                        <Avatar
+                            name={ticket.assignee.name}
+                            src={profileImage}
+                            emoji={!profileImage ? ticket.assignee.avatar : undefined}
+                            badge={profileImage ? ticket.assignee.avatar : undefined}
+                            size="sm"
+                        />
                     ) : (
-                        <span className="text-xs text-[var(--text-muted)] italic">Unassigned</span>
+                        <div className="w-6 h-6 border border-dashed border-[var(--border-secondary)] flex items-center justify-center text-[var(--text-muted)] text-xs">
+                            ?
+                        </div>
                     )}
                 </div>
-                <StatusBadge status={ticket.status} />
+
+                {/* Right: Content */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm text-[var(--text-primary)] line-clamp-2 leading-snug">
+                            {isRunning && (
+                                <span className="inline-block w-1.5 h-1.5 bg-[var(--status-progress-text)] rounded-full gentle-pulse mr-1.5 align-middle" />
+                            )}
+                            {ticket.title}
+                        </h4>
+                        <PriorityBadge priority={ticket.priority} />
+                    </div>
+
+                    {ticket.description && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-1">
+                            {ticket.description}
+                        </p>
+                    )}
+
+                    {(ticket.assignee || isRunning) && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1.5">
+                            {isRunning ? (
+                                <span className="text-[var(--status-progress-text)]">Working...</span>
+                            ) : (
+                                ticket.assignee?.name
+                            )}
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );
