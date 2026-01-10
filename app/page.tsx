@@ -10,6 +10,7 @@ import { ProjectSelector } from '@/components/project';
 import { Button } from '@/components/ui/Button';
 import { ResizablePane } from '@/components/ui/ResizablePane';
 import { ApiKeyModal } from '@/components/ui/ApiKeyModal';
+import { CLIWarningModal } from '@/components/ui/CLIWarningModal';
 
 interface RunningJob {
   id: string;
@@ -52,6 +53,7 @@ export default function Dashboard() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [cliWarningModalOpen, setCliWarningModalOpen] = useState(false);
   const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
   // Check for API key on mount
@@ -71,6 +73,20 @@ export default function Dashboard() {
           setApiKeyModalOpen(true);
         });
     }
+  }, []);
+
+  // Check for CLI tools on mount
+  useEffect(() => {
+    fetch('/api/check-cli')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.anyInstalled) {
+          setCliWarningModalOpen(true);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to check CLI installation:', err);
+      });
   }, []);
 
   // Poll for running jobs
@@ -325,6 +341,12 @@ export default function Dashboard() {
         isOpen={apiKeyModalOpen}
         onClose={() => { }}
         onSubmit={handleApiKeySubmit}
+      />
+
+      {/* CLI Warning Modal */}
+      <CLIWarningModal
+        isOpen={cliWarningModalOpen}
+        onClose={() => setCliWarningModalOpen(false)}
       />
     </div>
   );
