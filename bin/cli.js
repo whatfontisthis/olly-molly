@@ -123,6 +123,17 @@ async function main() {
 
     console.log('\n🚀 http://localhost:1234\n');
 
+    // Auto-open browser after a short delay
+    setTimeout(() => {
+        const url = 'http://localhost:1234';
+        const cmd = process.platform === 'darwin' ? 'open' 
+                  : process.platform === 'win32' ? 'start' 
+                  : 'xdg-open';
+        try {
+            execSync(`${cmd} ${url}`, { stdio: 'ignore' });
+        } catch {}
+    }, 2000);
+
     const server = spawn('npx', ['next', 'start', '--port', '1234'], {
         cwd: APP_DIR, stdio: 'inherit'
     });
