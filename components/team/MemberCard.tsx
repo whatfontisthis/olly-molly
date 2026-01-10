@@ -27,6 +27,7 @@ const roleImages: Record<string, string> = {
     FE_DEV: '/profiles/dev-frontend.png',
     BACKEND_DEV: '/profiles/dev-backend.png',
     QA: '/profiles/qa.png',
+    BUG_HUNTER: '/profiles/dev-bughunter.jpg',
 };
 
 const roleLabels: Record<string, string> = {
