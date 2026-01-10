@@ -40,6 +40,20 @@ function initializeDatabase() {
 // Initialize on first load
 initializeDatabase();
 
+// Run migrations for columns that may not exist in older databases
+function runMigrations() {
+  // Check if profile_image column exists in members table
+  const tableInfo = db.prepare("PRAGMA table_info(members)").all() as { name: string }[];
+  const hasProfileImage = tableInfo.some(col => col.name === 'profile_image');
+
+  if (!hasProfileImage) {
+    console.log('Running migration: Adding profile_image column to members table');
+    db.exec('ALTER TABLE members ADD COLUMN profile_image TEXT');
+  }
+}
+
+runMigrations();
+
 // Types
 export interface Member {
   id: string;
