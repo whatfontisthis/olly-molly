@@ -89,7 +89,7 @@ olly-molly
 ### Development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/olly-molly.git
+git clone https://github.com/ruucm/olly-molly.git
 cd olly-molly
 npm install
 npm run dev
@@ -128,7 +128,7 @@ We love contributions! Here's how you can help:
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/olly-molly.git
+git clone https://github.com/ruucm/olly-molly.git
 cd olly-molly
 
 # Install dependencies
@@ -173,7 +173,7 @@ olly-molly/
 
 ## License
 
-MIT © [Your Name]
+MIT © ruucm
 
 ---
 
