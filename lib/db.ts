@@ -51,12 +51,47 @@ function runMigrations() {
     db.exec('ALTER TABLE members ADD COLUMN profile_image TEXT');
   }
 
-  // Add Bug Hunter member if it doesn't exist
+  // Check if CHECK constraint needs updating for BUG_HUNTER role
+  // We detect this by checking if BUG_HUNTER already exists
   const bugHunter = db.prepare("SELECT id FROM members WHERE id = 'bughunter-001'").get();
   if (!bugHunter) {
+    console.log('Running migration: Updating members table for BUG_HUNTER role');
+
+    // SQLite doesn't support ALTER CHECK constraint, so we need to recreate the table
+    // First, check if the old constraint exists by trying to insert and catching error
+    try {
+      db.exec(`
+        -- Create new table with updated CHECK constraint
+        CREATE TABLE IF NOT EXISTS members_new (
+          id TEXT PRIMARY KEY,
+          role TEXT NOT NULL CHECK(role IN ('PM', 'FE_DEV', 'BACKEND_DEV', 'QA', 'DEVOPS', 'BUG_HUNTER')),
+          name TEXT NOT NULL,
+          avatar TEXT,
+          profile_image TEXT,
+          system_prompt TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Copy existing data
+        INSERT OR IGNORE INTO members_new (id, role, name, avatar, profile_image, system_prompt, created_at, updated_at)
+        SELECT id, role, name, avatar, profile_image, system_prompt, created_at, updated_at FROM members;
+
+        -- Drop old table
+        DROP TABLE members;
+
+        -- Rename new table
+        ALTER TABLE members_new RENAME TO members;
+      `);
+      console.log('Migration: Recreated members table with BUG_HUNTER support');
+    } catch (e) {
+      console.log('Migration: Table recreation skipped or already done:', e);
+    }
+
+    // Now add Bug Hunter member
     console.log('Running migration: Adding Bug Hunter member');
     db.prepare(`
-      INSERT INTO members (id, role, name, avatar, system_prompt) VALUES
+      INSERT OR IGNORE INTO members (id, role, name, avatar, system_prompt) VALUES
       ('bughunter-001', 'BUG_HUNTER', 'Bug Hunter', '🐛', 'You are a Bug Hunter AI agent - a Full Stack Developer specialized in fixing bugs. Your responsibilities include:
 - Quickly diagnosing and fixing bugs reported by users
 - Debugging both frontend and backend issues
