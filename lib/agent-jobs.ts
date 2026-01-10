@@ -84,21 +84,27 @@ export function startBackgroundJob(params: StartJobParams): void {
 
     if (provider === 'opencode') {
         execPath = OPENCODE_CMD;
-        args = ['run', prompt];
+        // Use stdin for prompt to avoid shell escaping issues
+        args = ['run', '-'];
         startMessage = `🚀 Starting OpenCode in ${projectPath}...\n\n`;
     } else {
         execPath = CLAUDE_CMD;
-        args = ['--print', '--dangerously-skip-permissions', prompt];
+        // Use stdin for prompt to avoid shell escaping issues
+        args = ['--print', '--dangerously-skip-permissions'];
         startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
     }
 
     const agentProcess = spawn(execPath, args, {
         cwd: projectPath,
         env: { ...process.env, PORT: '3001' },
-        shell: true,
+        shell: false,
         detached: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
     });
+
+    // Write prompt to stdin
+    agentProcess.stdin?.write(prompt);
+    agentProcess.stdin?.end();
 
     const job: RunningJob = {
         id: jobId,

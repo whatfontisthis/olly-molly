@@ -71,7 +71,7 @@ That's it. Open `http://localhost:1234` and start managing your AI team.
 ### Prerequisites
 
 - Node.js 18+
-- OpenAI API key (or compatible provider)
+- One of the following CLI tools: [OpenCode](https://github.com/sst/opencode) or [Claude CLI](https://github.com/anthropics/claude-code)
 
 ### Run with npx (Recommended)
 
@@ -118,17 +118,6 @@ npm install -g @anthropic-ai/claude-code
 ```
 
 > **Note:** Windows npm packages may not be officially supported. If installation fails, consider using WSL (Windows Subsystem for Linux) with Homebrew.
-
-## Configuration
-
-On first launch, you'll be prompted to enter your OpenAI API key. This is stored locally in your browser's localStorage.
-
-You can also set it via environment variable:
-
-```bash
-export OPENAI_API_KEY=your-key-here
-npx olly-molly
-```
 
 ## Project Selection
 
@@ -193,7 +182,7 @@ olly-molly/
 - **UI**: React 19, Tailwind CSS 4
 - **Database**: SQLite (better-sqlite3)
 - **Drag & Drop**: dnd-kit
-- **AI**: OpenAI API
+- **AI**: OpenCode / Claude CLI
 
 ## License
 

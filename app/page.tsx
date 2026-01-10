@@ -9,7 +9,7 @@ import { PMRequestModal } from '@/components/pm';
 import { ProjectSelector } from '@/components/project';
 import { Button } from '@/components/ui/Button';
 import { ResizablePane } from '@/components/ui/ResizablePane';
-import { ApiKeyModal } from '@/components/ui/ApiKeyModal';
+
 import { CLIWarningModal } from '@/components/ui/CLIWarningModal';
 
 interface RunningJob {
@@ -52,28 +52,11 @@ export default function Dashboard() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
-  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+
   const [cliWarningModalOpen, setCliWarningModalOpen] = useState(false);
   const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
-  // Check for API key on mount
-  useEffect(() => {
-    const storedKey = localStorage.getItem('openai_api_key');
-    if (!storedKey) {
-      // Check if there's an env variable
-      fetch('/api/check-api-key')
-        .then(res => res.json())
-        .then(data => {
-          if (!data.hasKey) {
-            setApiKeyModalOpen(true);
-          }
-        })
-        .catch(() => {
-          // If check fails, show modal
-          setApiKeyModalOpen(true);
-        });
-    }
-  }, []);
+
 
   // Check for CLI tools on mount
   useEffect(() => {
@@ -198,10 +181,7 @@ export default function Dashboard() {
     fetchData(activeProject?.id);
   }, [fetchData, activeProject]);
 
-  const handleApiKeySubmit = (apiKey: string) => {
-    localStorage.setItem('openai_api_key', apiKey);
-    setApiKeyModalOpen(false);
-  };
+
 
   const handleCreateTicket = () => {
     handleTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
@@ -337,12 +317,7 @@ export default function Dashboard() {
         projectId={activeProject?.id}
       />
 
-      {/* API Key Modal */}
-      <ApiKeyModal
-        isOpen={apiKeyModalOpen}
-        onClose={() => { }}
-        onSubmit={handleApiKeySubmit}
-      />
+
 
       {/* CLI Warning Modal */}
       <CLIWarningModal

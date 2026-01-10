@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ticketService, memberService } from '@/lib/db';
-import OpenAI from 'openai';
-
-// Create OpenAI client with provided API key
-function getOpenAI(apiKey?: string): OpenAI {
-    const key = apiKey || process.env.OPENAI_API_KEY;
-    if (!key) {
-        throw new Error('OpenAI API key not configured');
-    }
-    return new OpenAI({ apiKey: key });
-}
+import { ticketService, memberService, projectService } from '@/lib/db';
+import { spawn } from 'child_process';
 
 /**
- * PM Agent - AI-powered feature breakdown
+ * PM Agent - CLI-powered feature breakdown
  * 
- * Uses OpenAI to analyze feature requests and create appropriate tasks
+ * Uses opencode or claude CLI to analyze feature requests and create appropriate tasks
  * with intelligent assignment to team members.
  */
 
@@ -45,7 +36,7 @@ IMPORTANT RULES:
 - Be specific in task descriptions
 - Use Korean for titles and descriptions
 
-Respond in JSON format:
+CRITICAL: You MUST respond with ONLY a valid JSON object, no other text. The format must be exactly:
 {
   "tasks": [
     {
@@ -58,24 +49,93 @@ Respond in JSON format:
   "summary": "Brief summary of the breakdown in Korean"
 }`;
 
-async function breakdownWithAI(request: string, apiKey?: string): Promise<{ tasks: TaskFromAI[]; summary: string }> {
-    const completion = await getOpenAI(apiKey).chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Feature Request: ${request}` }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 2000,
-    });
+// Detect available CLI tool
+async function detectCLI(): Promise<'claude' | 'opencode' | null> {
+    const checkCommand = (cmd: string): Promise<boolean> => {
+        return new Promise((resolve) => {
+            const proc = spawn('which', [cmd], { shell: true });
+            proc.on('close', (code) => resolve(code === 0));
+            proc.on('error', () => resolve(false));
+        });
+    };
 
-    const content = completion.choices[0].message.content;
-    if (!content) {
-        throw new Error('No response from AI');
+    if (await checkCommand('claude')) return 'claude';
+    if (await checkCommand('opencode')) return 'opencode';
+    return null;
+}
+
+async function breakdownWithCLI(request: string, projectPath: string): Promise<{ tasks: TaskFromAI[]; summary: string }> {
+    const cli = await detectCLI();
+
+    if (!cli) {
+        throw new Error('No CLI tool available. Please install either claude or opencode.');
     }
 
-    return JSON.parse(content);
+    const fullPrompt = `${SYSTEM_PROMPT}
+
+Feature Request: ${request}`;
+
+    return new Promise((resolve, reject) => {
+        let output = '';
+        let errorOutput = '';
+
+        let args: string[];
+        if (cli === 'opencode') {
+            // opencode uses 'run' with stdin
+            args = ['run', '-'];
+        } else {
+            // claude reads from stdin when no prompt is provided with --print
+            args = ['--print', '--dangerously-skip-permissions'];
+        }
+
+        const proc = spawn(cli, args, {
+            cwd: projectPath,
+            shell: false,
+            env: { ...process.env },
+            stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        // Write prompt to stdin
+        proc.stdin?.write(fullPrompt);
+        proc.stdin?.end();
+
+        proc.stdout?.on('data', (data: Buffer) => {
+            output += data.toString('utf-8');
+        });
+
+        proc.stderr?.on('data', (data: Buffer) => {
+            errorOutput += data.toString('utf-8');
+        });
+
+        proc.on('close', (code) => {
+            if (code !== 0) {
+                reject(new Error(`CLI exited with code ${code}: ${errorOutput}`));
+                return;
+            }
+
+            try {
+                // Extract JSON from output (CLI might include extra text)
+                const jsonMatch = output.match(/\{[\s\S]*"tasks"[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('No valid JSON found in CLI output');
+                }
+                const parsed = JSON.parse(jsonMatch[0]);
+                resolve(parsed);
+            } catch (parseError) {
+                reject(new Error(`Failed to parse CLI output: ${parseError}`));
+            }
+        });
+
+        proc.on('error', (error) => {
+            reject(new Error(`Failed to start CLI: ${error.message}`));
+        });
+
+        // Timeout after 2 minutes
+        setTimeout(() => {
+            proc.kill();
+            reject(new Error('CLI timeout - process took too long'));
+        }, 120000);
+    });
 }
 
 function getAssigneeByRole(role: string): string | null {
@@ -94,19 +154,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get API key from request body or environment
-        const apiKey = body.api_key || process.env.OPENAI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'OpenAI API key not configured' },
-                { status: 500 }
-            );
-        }
+        // Get active project for CLI execution path
+        const project = projectService.getActive();
+        const projectPath = project?.path || process.cwd();
 
         const pmMember = memberService.getByRole('PM');
 
-        // Use AI to break down the request
-        const aiResponse = await breakdownWithAI(body.request, apiKey);
+        // Use CLI to break down the request
+        const aiResponse = await breakdownWithCLI(body.request, projectPath);
 
         const createdTickets = [];
 

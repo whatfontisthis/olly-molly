@@ -43,14 +43,12 @@ export function PMRequestModal({ isOpen, onClose, onTicketsCreated, projectId }:
         setError(null);
 
         try {
-            const apiKey = localStorage.getItem('openai_api_key');
             const res = await fetch('/api/pm/breakdown', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     request: request.trim(),
                     project_id: projectId,
-                    api_key: apiKey,
                 }),
             });
 
