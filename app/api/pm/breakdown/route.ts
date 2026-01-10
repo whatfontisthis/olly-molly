@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ticketService, memberService } from '@/lib/db';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization - only create client when needed (not at build time)
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+    if (!openaiClient) {
+        openaiClient = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
+    }
+    return openaiClient;
+}
 
 /**
  * PM Agent - AI-powered feature breakdown
@@ -54,7 +61,7 @@ Respond in JSON format:
 }`;
 
 async function breakdownWithAI(request: string): Promise<{ tasks: TaskFromAI[]; summary: string }> {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
             { role: 'system', content: SYSTEM_PROMPT },
