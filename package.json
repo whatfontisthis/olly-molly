@@ -1,6 +1,6 @@
 {
   "name": "olly-molly",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Your AI Development Team, Running Locally - Manage AI agents (PM, Frontend, Backend, QA) from a beautiful kanban board",
   "keywords": [
     "ai",
@@ -16,29 +16,23 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ruucm/olly-molly.git"
+    "url": "git+https://github.com/ruucm/olly-molly.git"
   },
   "homepage": "https://github.com/ruucm/olly-molly#readme",
   "bugs": {
     "url": "https://github.com/ruucm/olly-molly/issues"
   },
   "bin": {
-    "olly-molly": "./bin/cli.js"
+    "olly-molly": "bin/cli.js"
   },
   "files": [
-    "bin",
-    ".next",
-    "public",
-    "db/*.sql",
-    "next.config.ts",
-    "package.json"
+    "bin"
   ],
   "scripts": {
     "dev": "next dev --port 1234",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prepublishOnly": "npm run build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
