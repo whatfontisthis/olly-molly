@@ -207,8 +207,9 @@ export function TicketSidebar({
                 // Clear feedback
                 setFeedback('');
 
-                // Update ticket status
+                // Update ticket status locally and in parent
                 setStatus('IN_PROGRESS');
+                onTicketUpdate(ticket.id, { status: 'IN_PROGRESS' });
 
                 // Close agent controls after execution
                 setShowAgentControls(false);

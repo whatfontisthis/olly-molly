@@ -8,6 +8,7 @@ import { PMRequestModal } from '@/components/pm';
 import { ProjectSelector } from '@/components/project';
 import { Button } from '@/components/ui/Button';
 import { ResizablePane } from '@/components/ui/ResizablePane';
+import { ApiKeyModal } from '@/components/ui/ApiKeyModal';
 
 interface Member {
   id: string;
@@ -43,6 +44,26 @@ export default function Dashboard() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+
+  // Check for API key on mount
+  useEffect(() => {
+    const storedKey = localStorage.getItem('openai_api_key');
+    if (!storedKey) {
+      // Check if there's an env variable
+      fetch('/api/check-api-key')
+        .then(res => res.json())
+        .then(data => {
+          if (!data.hasKey) {
+            setApiKeyModalOpen(true);
+          }
+        })
+        .catch(() => {
+          // If check fails, show modal
+          setApiKeyModalOpen(true);
+        });
+    }
+  }, []);
 
   // Fetch data
   const fetchData = useCallback(async (projectId?: string) => {
@@ -136,6 +157,11 @@ export default function Dashboard() {
   const handleRefresh = useCallback(() => {
     fetchData(activeProject?.id);
   }, [fetchData, activeProject]);
+
+  const handleApiKeySubmit = (apiKey: string) => {
+    localStorage.setItem('openai_api_key', apiKey);
+    setApiKeyModalOpen(false);
+  };
 
   if (loading) {
     return (
@@ -253,6 +279,13 @@ export default function Dashboard() {
         onClose={() => setPmModalOpen(false)}
         onTicketsCreated={handlePMTicketsCreated}
         projectId={activeProject?.id}
+      />
+
+      {/* API Key Modal */}
+      <ApiKeyModal
+        isOpen={apiKeyModalOpen}
+        onClose={() => { }}
+        onSubmit={handleApiKeySubmit}
       />
     </div>
   );
