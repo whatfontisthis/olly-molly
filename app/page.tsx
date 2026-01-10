@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { KanbanBoard } from '@/components/kanban';
+import { KanbanBoard, TicketSidebar } from '@/components/kanban';
 import { TeamPanel } from '@/components/team';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PMRequestModal } from '@/components/pm';
 import { ProjectSelector } from '@/components/project';
 import { Button } from '@/components/ui/Button';
+import { ResizablePane } from '@/components/ui/ResizablePane';
 
 interface Member {
   id: string;
@@ -40,6 +41,8 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pmModalOpen, setPmModalOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
 
   // Fetch data
   const fetchData = useCallback(async (projectId?: string) => {
@@ -190,19 +193,49 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <div className="flex">
-        {/* Kanban Board */}
-        <main className={`flex-1 p-6 transition-all duration-300 ${sidebarOpen ? 'mr-80' : ''}`}>
-          <KanbanBoard
-            tickets={tickets}
-            members={members}
-            onTicketCreate={handleTicketCreate}
-            onTicketUpdate={handleTicketUpdate}
-            onTicketDelete={handleTicketDelete}
-            hasActiveProject={!!activeProject}
-            onRefresh={handleRefresh}
-          />
-        </main>
+      <div className="flex h-[calc(100vh-73px)]">
+        <ResizablePane
+          defaultLeftWidth={ticketSidebarOpen ? 55 : 100}
+          minLeftWidth={30}
+          minRightWidth={25}
+          left={
+            <div className="p-6 h-full overflow-auto">
+              <KanbanBoard
+                tickets={tickets}
+                members={members}
+                onTicketCreate={handleTicketCreate}
+                onTicketUpdate={handleTicketUpdate}
+                onTicketDelete={handleTicketDelete}
+                hasActiveProject={!!activeProject}
+                onRefresh={handleRefresh}
+                onTicketSelect={(ticket) => {
+                  setSelectedTicket(ticket);
+                  setTicketSidebarOpen(true);
+                }}
+              />
+            </div>
+          }
+          right={
+            ticketSidebarOpen && selectedTicket ? (
+              <TicketSidebar
+                isOpen={ticketSidebarOpen}
+                onClose={() => {
+                  setTicketSidebarOpen(false);
+                  setSelectedTicket(null);
+                }}
+                ticket={selectedTicket}
+                members={members}
+                onTicketUpdate={handleTicketUpdate}
+                onTicketDelete={handleTicketDelete}
+                hasActiveProject={!!activeProject}
+              />
+            ) : (
+              <div className="h-full bg-secondary border-l border-primary flex items-center justify-center text-muted">
+                <p>Select a ticket to view details</p>
+              </div>
+            )
+          }
+        />
 
         {/* Team Sidebar */}
         <aside className={`

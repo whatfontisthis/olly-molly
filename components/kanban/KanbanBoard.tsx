@@ -15,7 +15,6 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
 import { TicketCard } from './TicketCard';
-import { TicketSidebar } from './TicketSidebar';
 import { Button } from '@/components/ui/Button';
 
 interface Member {
@@ -51,6 +50,7 @@ interface KanbanBoardProps {
     onTicketDelete: (id: string) => void;
     hasActiveProject?: boolean;
     onRefresh?: () => void;
+    onTicketSelect?: (ticket: Ticket) => void;
 }
 
 const columns = [
@@ -62,10 +62,8 @@ const columns = [
     { id: 'ON_HOLD', title: 'On Hold', color: 'text-amber-500', icon: '⏸️' },
 ];
 
-export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, hasActiveProject, onRefresh }: KanbanBoardProps) {
+export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, hasActiveProject, onRefresh, onTicketSelect }: KanbanBoardProps) {
     const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
-    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
     const sensors = useSensors(
@@ -131,28 +129,14 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
     };
 
     const handleTicketClick = useCallback((ticket: Ticket) => {
-        setSelectedTicket(ticket);
-        setIsSidebarOpen(true);
-    }, []);
+        onTicketSelect?.(ticket);
+    }, [onTicketSelect]);
 
     const handleCreateClick = () => {
         // For now, creating tickets still uses inline approach or can be added to sidebar
         // We'll create a minimal ticket and open sidebar
         onTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
     };
-
-    const handleSidebarClose = () => {
-        setIsSidebarOpen(false);
-        setSelectedTicket(null);
-    };
-
-    const handleTicketUpdate = (id: string, data: Partial<Ticket>) => {
-        onTicketUpdate(id, data);
-    };
-
-    const handleTicketStatusChange = useCallback(() => {
-        onRefresh?.();
-    }, [onRefresh]);
 
     const runningCount = runningJobs.filter(j => j.status === 'running').length;
 
@@ -215,17 +199,6 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
                     )}
                 </DragOverlay>
             </DndContext>
-
-            {/* Sidebar */}
-            <TicketSidebar
-                isOpen={isSidebarOpen}
-                onClose={handleSidebarClose}
-                ticket={selectedTicket}
-                members={members}
-                onTicketUpdate={handleTicketUpdate}
-                onTicketDelete={onTicketDelete}
-                hasActiveProject={hasActiveProject}
-            />
         </div>
     );
 }

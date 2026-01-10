@@ -233,11 +233,7 @@ export function TicketSidebar({
     if (!isOpen || !ticket) return null;
 
     return (
-        <div
-            className={`fixed right-0 top-[73px] bottom-0 w-[700px] bg-secondary border-l border-primary
-            transition-transform duration-300 z-30 flex flex-col
-            ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        >
+        <div className="h-full bg-secondary border-l border-primary flex flex-col overflow-hidden">
             {/* Minimal Header */}
             <div className="p-3 border-b border-primary flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -359,8 +355,8 @@ export function TicketSidebar({
                                         onClick={() => setProvider('claude')}
                                         disabled={executing}
                                         className={`px-2 py-1 rounded text-xs font-medium transition-all ${provider === 'claude'
-                                                ? 'bg-indigo-500 text-white'
-                                                : 'bg-tertiary text-tertiary hover:text-primary'
+                                            ? 'bg-indigo-500 text-white'
+                                            : 'bg-tertiary text-tertiary hover:text-primary'
                                             } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         🟣 Claude
@@ -369,8 +365,8 @@ export function TicketSidebar({
                                         onClick={() => setProvider('opencode')}
                                         disabled={executing}
                                         className={`px-2 py-1 rounded text-xs font-medium transition-all ${provider === 'opencode'
-                                                ? 'bg-emerald-500 text-white'
-                                                : 'bg-tertiary text-tertiary hover:text-primary'
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'bg-tertiary text-tertiary hover:text-primary'
                                             } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         🟢 OpenCode
