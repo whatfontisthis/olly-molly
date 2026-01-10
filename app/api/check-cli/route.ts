@@ -5,8 +5,10 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 async function checkCommandExists(command: string): Promise<boolean> {
+    const isWindows = process.platform === 'win32';
+    const checkCmd = isWindows ? `where ${command}` : `which ${command}`;
     try {
-        await execAsync(`which ${command}`);
+        await execAsync(checkCmd);
         return true;
     } catch {
         return false;

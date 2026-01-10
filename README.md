@@ -95,6 +95,30 @@ npm install
 npm run dev
 ```
 
+### AI CLI Tools (Required for Agent Execution)
+
+To run AI agents, you need to install either OpenCode or Claude CLI:
+
+**macOS (via Homebrew):**
+```bash
+# OpenCode
+brew install sst/tap/opencode
+
+# Claude CLI
+brew install anthropics/tap/claude-code
+```
+
+**Windows:**
+```bash
+# OpenCode (via npm)
+npm install -g opencode
+
+# Claude CLI (via npm)
+npm install -g @anthropic-ai/claude-code
+```
+
+> **Note:** Windows npm packages may not be officially supported. If installation fails, consider using WSL (Windows Subsystem for Linux) with Homebrew.
+
 ## Configuration
 
 On first launch, you'll be prompted to enter your OpenAI API key. This is stored locally in your browser's localStorage.

@@ -3,8 +3,8 @@ import { conversationService, conversationMessageService, activityService, ticke
 
 export type AgentProvider = 'claude' | 'opencode';
 
-const CLAUDE_PATH = '/opt/homebrew/bin/claude';
-const OPENCODE_PATH = '/opt/homebrew/bin/opencode';
+const CLAUDE_CMD = 'claude';
+const OPENCODE_CMD = 'opencode';
 
 interface RunningJob {
     id: string;
@@ -83,11 +83,11 @@ export function startBackgroundJob(params: StartJobParams): void {
     let startMessage: string;
 
     if (provider === 'opencode') {
-        execPath = OPENCODE_PATH;
+        execPath = OPENCODE_CMD;
         args = ['run', prompt];
         startMessage = `🚀 Starting OpenCode in ${projectPath}...\n\n`;
     } else {
-        execPath = CLAUDE_PATH;
+        execPath = CLAUDE_CMD;
         args = ['--print', '--dangerously-skip-permissions', prompt];
         startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
     }
@@ -95,6 +95,7 @@ export function startBackgroundJob(params: StartJobParams): void {
     const agentProcess = spawn(execPath, args, {
         cwd: projectPath,
         env: { ...process.env, PORT: '3001' },
+        shell: true,
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe'],
     });
