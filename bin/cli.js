@@ -6,25 +6,28 @@ const fs = require('fs');
 const os = require('os');
 const https = require('https');
 
+const PACKAGE_NAME = 'olly-molly';
 const REPO = 'ruucm/olly-molly';
 const APP_DIR = path.join(os.homedir(), '.olly-molly');
 const DB_DIR = path.join(APP_DIR, 'db');
 const TARBALL_URL = `https://github.com/${REPO}/archive/refs/heads/main.tar.gz`;
-const VERSION_URL = `https://raw.githubusercontent.com/${REPO}/main/package.json`;
 
 console.log('\n🐙 Olly Molly\n');
 
-function fetchJSON(url) {
-    return new Promise((resolve, reject) => {
-        const get = (u) => {
-            https.get(u, (res) => {
-                if (res.statusCode === 302 || res.statusCode === 301) return get(res.headers.location);
-                let data = '';
-                res.on('data', c => data += c);
-                res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(); } });
-            }).on('error', reject);
-        };
-        get(url);
+// Get latest version from npm registry
+function getNpmVersion() {
+    return new Promise((resolve) => {
+        https.get(`https://registry.npmjs.org/${PACKAGE_NAME}/latest`, (res) => {
+            let data = '';
+            res.on('data', c => data += c);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data).version);
+                } catch {
+                    resolve(null);
+                }
+            });
+        }).on('error', () => resolve(null));
     });
 }
 
@@ -52,12 +55,10 @@ function download(url, destDir) {
 
 function getLocalVersion() {
     try {
-        const pkg = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8'));
-        return pkg.version;
+        return JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8')).version;
     } catch { return null; }
 }
 
-// Backup and restore user's database
 function backupDB() {
     const backupDir = path.join(os.tmpdir(), 'olly-molly-db-backup');
     if (fs.existsSync(DB_DIR)) {
@@ -70,10 +71,8 @@ function backupDB() {
 function restoreDB(backupDir) {
     if (backupDir && fs.existsSync(backupDir)) {
         fs.mkdirSync(DB_DIR, { recursive: true });
-        // Only restore sqlite files, not schema files
-        const files = fs.readdirSync(backupDir);
-        for (const file of files) {
-            if (file.endsWith('.sqlite') || file.endsWith('.sqlite-shm') || file.endsWith('.sqlite-wal')) {
+        for (const file of fs.readdirSync(backupDir)) {
+            if (file.includes('.sqlite')) {
                 fs.copyFileSync(path.join(backupDir, file), path.join(DB_DIR, file));
             }
         }
@@ -85,54 +84,38 @@ async function main() {
     let needsInstall = false;
     let needsBuild = false;
 
-    // Check for updates
     const localVersion = getLocalVersion();
-    let remoteVersion = null;
-    
-    try {
-        remoteVersion = (await fetchJSON(VERSION_URL)).version;
-    } catch {
-        // Offline - continue with local
-    }
+    const npmVersion = await getNpmVersion();
 
-    // Update if version changed (preserve DB!)
-    if (localVersion && remoteVersion && localVersion !== remoteVersion) {
-        console.log(`🔄 Updating ${localVersion} → ${remoteVersion}\n`);
-        
-        // Backup DB before update
+    // Update if npm version is newer
+    if (localVersion && npmVersion && localVersion !== npmVersion) {
+        console.log(`🔄 Updating ${localVersion} → ${npmVersion}\n`);
         const dbBackup = backupDB();
-        
-        // Remove app (but DB is backed up)
         fs.rmSync(APP_DIR, { recursive: true, force: true });
-        
-        // Download new version
         console.log('📥 Downloading...');
         await download(TARBALL_URL, APP_DIR);
-        console.log('✅ Done\n');
-        
-        // Restore DB
+        console.log('✅ Downloaded\n');
         restoreDB(dbBackup);
-        
         needsInstall = true;
         needsBuild = true;
     }
 
-    // First time download
+    // First time
     if (!fs.existsSync(APP_DIR)) {
         console.log('📥 Downloading...');
         await download(TARBALL_URL, APP_DIR);
-        console.log('✅ Done\n');
+        console.log('✅ Downloaded\n');
         needsInstall = true;
         needsBuild = true;
     }
 
-    // Install if needed
+    // Install
     if (needsInstall || !fs.existsSync(path.join(APP_DIR, 'node_modules'))) {
-        console.log('📦 Installing dependencies...\n');
+        console.log('📦 Installing...\n');
         execSync('npm install --omit=dev', { cwd: APP_DIR, stdio: 'inherit' });
     }
 
-    // Build if needed
+    // Build
     if (needsBuild || !fs.existsSync(path.join(APP_DIR, '.next'))) {
         console.log('\n🔨 Building...\n');
         execSync('npm run build', { cwd: APP_DIR, stdio: 'inherit' });
