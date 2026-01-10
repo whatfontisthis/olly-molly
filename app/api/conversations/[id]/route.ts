@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { conversationService, conversationMessageService } from '@/lib/db';
 
 interface RouteParams {
-    params: {
+    params: Promise<{
         id: string;
-    };
+    }>;
 }
 
 // GET /api/conversations/[id]
