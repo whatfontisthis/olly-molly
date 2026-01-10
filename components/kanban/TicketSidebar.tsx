@@ -90,8 +90,11 @@ export function TicketSidebar({
             setStatus(ticket.status);
             setPriority(ticket.priority);
             setAssigneeId(ticket.assignee_id || '');
+            // Reset executing state and conversation selection when switching tickets
+            setExecuting(false);
+            setSelectedConversationId(null);
         }
-    }, [ticket]);
+    }, [ticket?.id]);
 
     // Fetch conversations when ticket changes
     useEffect(() => {
@@ -129,17 +132,39 @@ export function TicketSidebar({
             return;
         }
 
+        let isCancelled = false;
+        let wasRunning = false;
+
         const fetchMessages = async () => {
+            if (isCancelled) return;
+
             try {
                 const res = await fetch(`/api/conversations/${selectedConversationId}`);
                 const data = await res.json();
+
+                if (isCancelled) return;
+
                 setConversationMessages(data.messages || []);
 
+                const isCurrentlyRunning = data.conversation?.status === 'running';
+
                 // Check if conversation is still running
-                if (data.conversation?.status === 'running') {
+                if (isCurrentlyRunning) {
                     setExecuting(true);
+                    wasRunning = true;
                 } else {
                     setExecuting(false);
+                    // If conversation just completed (was running, now not), refresh ticket status
+                    if (wasRunning && ticket && !isCancelled) {
+                        wasRunning = false;
+                        // Fetch updated ticket status
+                        const ticketRes = await fetch(`/api/tickets/${ticket.id}`);
+                        const ticketData = await ticketRes.json();
+                        if (ticketData.status && !isCancelled) {
+                            setStatus(ticketData.status);
+                            onTicketUpdate(ticket.id, { status: ticketData.status });
+                        }
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch messages:', error);
@@ -151,11 +176,12 @@ export function TicketSidebar({
         pollIntervalRef.current = setInterval(fetchMessages, 500);
 
         return () => {
+            isCancelled = true;
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
             }
         };
-    }, [selectedConversationId]);
+    }, [selectedConversationId, ticket?.id, onTicketUpdate]);
 
     const handleSave = () => {
         if (!ticket) return;

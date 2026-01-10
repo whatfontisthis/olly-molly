@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Conversation, ConversationMessage } from '@/lib/db';
 
 interface ConversationViewProps {
@@ -11,11 +11,26 @@ interface ConversationViewProps {
 
 export function ConversationView({ conversation, messages, isRunning = false }: ConversationViewProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [hasInitiallyScrolled, setHasInitiallyScrolled] = useState(false);
+    const prevConversationId = useRef<string | null>(null);
 
-    // Auto-scroll to bottom when new messages arrive
+    // Reset scroll flag when conversation changes
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (conversation?.id !== prevConversationId.current) {
+            prevConversationId.current = conversation?.id || null;
+            setHasInitiallyScrolled(false);
+        }
+    }, [conversation?.id]);
+
+    // Scroll to bottom: once on initial load, then only when running
+    useEffect(() => {
+        if (!hasInitiallyScrolled && messages.length > 0) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+            setHasInitiallyScrolled(true);
+        } else if (isRunning) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, isRunning, hasInitiallyScrolled]);
 
     if (!conversation) {
         return (
