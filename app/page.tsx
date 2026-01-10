@@ -287,6 +287,7 @@ export default function Dashboard() {
                 onTicketCreate={handleTicketCreate}
                 onTicketUpdate={handleTicketUpdate}
                 onTicketDelete={handleTicketDelete}
+                onTicketsReorder={setTickets}
                 hasActiveProject={!!activeProject}
                 onRefresh={handleRefresh}
                 onTicketSelect={(ticket) => {

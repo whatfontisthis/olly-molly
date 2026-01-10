@@ -11,8 +11,9 @@ import {
     useSensors,
     DragStartEvent,
     DragEndEvent,
+    DragOverEvent,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
 import { TicketCard } from './TicketCard';
 
@@ -47,6 +48,7 @@ interface KanbanBoardProps {
     onTicketUpdate: (id: string, data: Partial<Ticket>) => void;
     onTicketCreate: (data: Partial<Ticket>) => void;
     onTicketDelete: (id: string) => void;
+    onTicketsReorder?: (tickets: Ticket[]) => void;
     hasActiveProject?: boolean;
     onRefresh?: () => void;
     onTicketSelect?: (ticket: Ticket) => void;
@@ -61,7 +63,7 @@ const columns = [
     { id: 'ON_HOLD', title: 'On Hold', color: 'text-amber-500', icon: '⏸️' },
 ];
 
-export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, hasActiveProject, onRefresh, onTicketSelect }: KanbanBoardProps) {
+export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, onTicketDelete, onTicketsReorder, hasActiveProject, onRefresh, onTicketSelect }: KanbanBoardProps) {
     const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
     const [runningJobs, setRunningJobs] = useState<RunningJob[]>([]);
 
@@ -123,6 +125,25 @@ export function KanbanBoard({ tickets, members, onTicketUpdate, onTicketCreate, 
             const ticket = tickets.find(t => t.id === ticketId);
             if (ticket && ticket.status !== targetColumn.id) {
                 onTicketUpdate(ticketId, { status: targetColumn.id });
+            }
+            return;
+        }
+
+        // Check if reordering within the same column
+        const draggedTicket = tickets.find(t => t.id === ticketId);
+        const overTicket = tickets.find(t => t.id === overId);
+
+        if (draggedTicket && overTicket && draggedTicket.status === overTicket.status) {
+            const columnTickets = tickets.filter(t => t.status === draggedTicket.status);
+            const otherTickets = tickets.filter(t => t.status !== draggedTicket.status);
+
+            const oldIndex = columnTickets.findIndex(t => t.id === ticketId);
+            const newIndex = columnTickets.findIndex(t => t.id === overId);
+
+            if (oldIndex !== newIndex) {
+                const reorderedColumnTickets = arrayMove(columnTickets, oldIndex, newIndex);
+                const newTickets = [...otherTickets, ...reorderedColumnTickets];
+                onTicketsReorder?.(newTickets);
             }
         }
     };
