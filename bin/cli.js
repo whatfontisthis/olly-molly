@@ -8,6 +8,7 @@ const https = require('https');
 
 const REPO = 'ruucm/olly-molly';
 const APP_DIR = path.join(os.homedir(), '.olly-molly');
+const DB_DIR = path.join(APP_DIR, 'db');
 const TARBALL_URL = `https://github.com/${REPO}/archive/refs/heads/main.tar.gz`;
 const VERSION_URL = `https://raw.githubusercontent.com/${REPO}/main/package.json`;
 
@@ -56,6 +57,30 @@ function getLocalVersion() {
     } catch { return null; }
 }
 
+// Backup and restore user's database
+function backupDB() {
+    const backupDir = path.join(os.tmpdir(), 'olly-molly-db-backup');
+    if (fs.existsSync(DB_DIR)) {
+        fs.cpSync(DB_DIR, backupDir, { recursive: true });
+        return backupDir;
+    }
+    return null;
+}
+
+function restoreDB(backupDir) {
+    if (backupDir && fs.existsSync(backupDir)) {
+        fs.mkdirSync(DB_DIR, { recursive: true });
+        // Only restore sqlite files, not schema files
+        const files = fs.readdirSync(backupDir);
+        for (const file of files) {
+            if (file.endsWith('.sqlite') || file.endsWith('.sqlite-shm') || file.endsWith('.sqlite-wal')) {
+                fs.copyFileSync(path.join(backupDir, file), path.join(DB_DIR, file));
+            }
+        }
+        fs.rmSync(backupDir, { recursive: true, force: true });
+    }
+}
+
 async function main() {
     let needsInstall = false;
     let needsBuild = false;
@@ -70,15 +95,29 @@ async function main() {
         // Offline - continue with local
     }
 
-    // Update if version changed
+    // Update if version changed (preserve DB!)
     if (localVersion && remoteVersion && localVersion !== remoteVersion) {
         console.log(`🔄 Updating ${localVersion} → ${remoteVersion}\n`);
+        
+        // Backup DB before update
+        const dbBackup = backupDB();
+        
+        // Remove app (but DB is backed up)
         fs.rmSync(APP_DIR, { recursive: true, force: true });
+        
+        // Download new version
+        console.log('📥 Downloading...');
+        await download(TARBALL_URL, APP_DIR);
+        console.log('✅ Done\n');
+        
+        // Restore DB
+        restoreDB(dbBackup);
+        
         needsInstall = true;
         needsBuild = true;
     }
 
-    // Download if needed
+    // First time download
     if (!fs.existsSync(APP_DIR)) {
         console.log('📥 Downloading...');
         await download(TARBALL_URL, APP_DIR);
