@@ -162,7 +162,7 @@ async function main() {
     }, 2000);
 
     const server = spawn('npx', ['next', 'start', '--port', '1234'], {
-        cwd: APP_DIR, stdio: 'inherit'
+        cwd: APP_DIR, stdio: 'inherit', shell: true
     });
 
     server.on('close', (code) => process.exit(code || 0));
