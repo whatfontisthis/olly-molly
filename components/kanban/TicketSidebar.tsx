@@ -71,6 +71,10 @@ export function TicketSidebar({
     const [provider, setProvider] = useState<AgentProvider>('opencode');
     const [executing, setExecuting] = useState(false);
 
+    // UI state
+    const [showTicketDetails, setShowTicketDetails] = useState(false);
+    const [showAgentControls, setShowAgentControls] = useState(false);
+
     // Conversations
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -205,6 +209,9 @@ export function TicketSidebar({
 
                 // Update ticket status
                 setStatus('IN_PROGRESS');
+
+                // Close agent controls after execution
+                setShowAgentControls(false);
             } else {
                 alert(data.error || 'Failed to start agent');
                 setExecuting(false);
@@ -231,127 +238,180 @@ export function TicketSidebar({
             transition-transform duration-300 z-30 flex flex-col
             ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
         >
-            {/* Header */}
-            <div className="p-4 border-b border-primary flex items-center justify-between flex-shrink-0">
-                <h2 className="text-lg font-semibold text-primary">Ticket Details</h2>
-                <button
-                    onClick={onClose}
-                    className="p-2 text-tertiary hover:text-primary hover:bg-tertiary rounded-lg transition-colors"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+            {/* Minimal Header */}
+            <div className="p-3 border-b border-primary flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-primary truncate">{ticket.title}</h3>
+                    <span className="text-xs px-2 py-0.5 rounded bg-tertiary text-muted">{ticket.status}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    {/* Menu Button */}
+                    <button
+                        onClick={() => setShowTicketDetails(!showTicketDetails)}
+                        className="p-2 text-tertiary hover:text-primary hover:bg-tertiary rounded-lg transition-colors"
+                        title="Ticket Details"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d={showTicketDetails ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-tertiary hover:text-primary hover:bg-tertiary rounded-lg transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            {/* Ticket Info - Compact */}
-            <div className="p-4 border-b border-primary space-y-3 flex-shrink-0">
-                <Input
-                    label="Title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="text-sm"
-                />
-                <Textarea
-                    label="Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={2}
-                    className="text-sm"
-                />
-                <div className="grid grid-cols-3 gap-2">
-                    <Select
-                        label="Status"
-                        value={status}
-                        onChange={setStatus}
-                        options={statusOptions}
+            {/* Collapsible Ticket Details */}
+            {showTicketDetails && (
+                <div className="p-4 border-b border-primary space-y-3 flex-shrink-0 bg-tertiary">
+                    <Input
+                        label="Title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
                         className="text-sm"
                     />
-                    <Select
-                        label="Priority"
-                        value={priority}
-                        onChange={setPriority}
-                        options={priorityOptions}
+                    <Textarea
+                        label="Description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={2}
                         className="text-sm"
                     />
-                    <Select
-                        label="Assignee"
-                        value={assigneeId}
-                        onChange={setAssigneeId}
-                        options={memberOptions}
-                        className="text-sm"
-                    />
+                    <div className="grid grid-cols-3 gap-2">
+                        <Select
+                            label="Status"
+                            value={status}
+                            onChange={setStatus}
+                            options={statusOptions}
+                            className="text-sm"
+                        />
+                        <Select
+                            label="Priority"
+                            value={priority}
+                            onChange={setPriority}
+                            options={priorityOptions}
+                            className="text-sm"
+                        />
+                        <Select
+                            label="Assignee"
+                            value={assigneeId}
+                            onChange={setAssigneeId}
+                            options={memberOptions}
+                            className="text-sm"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSave} variant="primary" size="sm">Save</Button>
+                        {onTicketDelete && (
+                            <Button onClick={handleDelete} variant="danger" size="sm">Delete</Button>
+                        )}
+                        <Button onClick={() => setShowTicketDetails(false)} variant="ghost" size="sm">Close</Button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button onClick={handleSave} variant="primary" size="sm">Save</Button>
-                    {onTicketDelete && (
-                        <Button onClick={handleDelete} variant="danger" size="sm">Delete</Button>
-                    )}
-                </div>
-            </div>
+            )}
 
             {/* AI Agent Execution Section */}
             {ticket.assignee_id && (
                 <div className="flex-1 flex flex-col min-h-0">
-                    {/* Agent Control Panel */}
-                    <div className="p-4 border-b border-primary space-y-3 flex-shrink-0">
-                        <div className="flex items-center justify-between">
-                            <span className="font-medium text-primary flex items-center gap-2">
-                                <span>🤖</span> AI Agent Execution
-                            </span>
-                            {!executing && (
+                    {/* Minimal Agent Control Bar */}
+                    <div className="p-2 border-b border-primary flex items-center justify-between flex-shrink-0 bg-tertiary/50">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-primary">🤖 AI Agent</span>
+                            {ticket.assignee && (
+                                <span className="text-xs text-muted">
+                                    {ticket.assignee.avatar} {ticket.assignee.name}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {!showAgentControls && !executing && (
                                 <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={handleExecuteAgent}
                                     disabled={!hasActiveProject}
                                 >
-                                    🚀 Execute Agent
+                                    🚀 Execute
                                 </Button>
                             )}
+                            <button
+                                onClick={() => setShowAgentControls(!showAgentControls)}
+                                className="p-1.5 text-xs text-tertiary hover:text-primary hover:bg-tertiary rounded transition-colors"
+                            >
+                                {showAgentControls ? '▲' : '▼'}
+                            </button>
                         </div>
-
-                        <div className="flex items-center gap-3">
-                            <label className="text-sm text-tertiary">Provider:</label>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setProvider('claude')}
-                                    disabled={executing}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'claude'
-                                            ? 'bg-indigo-500 text-white'
-                                            : 'bg-tertiary text-tertiary hover:text-primary'
-                                        } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    🟣 Claude
-                                </button>
-                                <button
-                                    onClick={() => setProvider('opencode')}
-                                    disabled={executing}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'opencode'
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-tertiary text-tertiary hover:text-primary'
-                                        } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    🟢 OpenCode
-                                </button>
-                            </div>
-                        </div>
-
-                        <Textarea
-                            value={feedback}
-                            onChange={(e) => setFeedback(e.target.value)}
-                            placeholder="Optional feedback or instructions for the agent..."
-                            rows={2}
-                            className="text-sm bg-tertiary"
-                            disabled={executing}
-                        />
-
-                        {!hasActiveProject && (
-                            <p className="text-sm text-amber-400">⚠️ Select a project first</p>
-                        )}
                     </div>
 
-                    {/* Conversations Section */}
+                    {/* Collapsible Agent Controls */}
+                    {showAgentControls && (
+                        <div className="p-3 border-b border-primary space-y-2 flex-shrink-0 bg-tertiary/30">
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs text-tertiary">Provider:</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setProvider('claude')}
+                                        disabled={executing}
+                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${provider === 'claude'
+                                                ? 'bg-indigo-500 text-white'
+                                                : 'bg-tertiary text-tertiary hover:text-primary'
+                                            } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        🟣 Claude
+                                    </button>
+                                    <button
+                                        onClick={() => setProvider('opencode')}
+                                        disabled={executing}
+                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${provider === 'opencode'
+                                                ? 'bg-emerald-500 text-white'
+                                                : 'bg-tertiary text-tertiary hover:text-primary'
+                                            } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        🟢 OpenCode
+                                    </button>
+                                </div>
+                            </div>
+
+                            <Textarea
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                                placeholder="Optional feedback or instructions..."
+                                rows={2}
+                                className="text-xs bg-secondary"
+                                disabled={executing}
+                            />
+
+                            {!hasActiveProject && (
+                                <p className="text-xs text-amber-400">⚠️ Select a project first</p>
+                            )}
+
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={handleExecuteAgent}
+                                    disabled={!hasActiveProject || executing}
+                                >
+                                    🚀 Execute Agent
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowAgentControls(false)}
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Conversations Section - Takes up remaining 90%+ */}
                     <div className="flex-1 flex min-h-0">
                         {/* Conversation List */}
                         <div className="w-56 border-r border-primary overflow-y-auto flex-shrink-0">
