@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ticketService, memberService } from '@/lib/db';
 import OpenAI from 'openai';
 
-// Lazy initialization - only create client when needed (not at build time)
-let openaiClient: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-    if (!openaiClient) {
-        openaiClient = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        });
+// Create OpenAI client with provided API key
+function getOpenAI(apiKey?: string): OpenAI {
+    const key = apiKey || process.env.OPENAI_API_KEY;
+    if (!key) {
+        throw new Error('OpenAI API key not configured');
     }
-    return openaiClient;
+    return new OpenAI({ apiKey: key });
 }
 
 /**
@@ -60,8 +58,8 @@ Respond in JSON format:
   "summary": "Brief summary of the breakdown in Korean"
 }`;
 
-async function breakdownWithAI(request: string): Promise<{ tasks: TaskFromAI[]; summary: string }> {
-    const completion = await getOpenAI().chat.completions.create({
+async function breakdownWithAI(request: string, apiKey?: string): Promise<{ tasks: TaskFromAI[]; summary: string }> {
+    const completion = await getOpenAI(apiKey).chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
             { role: 'system', content: SYSTEM_PROMPT },
@@ -96,7 +94,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!process.env.OPENAI_API_KEY) {
+        // Get API key from request body or environment
+        const apiKey = body.api_key || process.env.OPENAI_API_KEY;
+        if (!apiKey) {
             return NextResponse.json(
                 { error: 'OpenAI API key not configured' },
                 { status: 500 }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         const pmMember = memberService.getByRole('PM');
 
         // Use AI to break down the request
-        const aiResponse = await breakdownWithAI(body.request);
+        const aiResponse = await breakdownWithAI(body.request, apiKey);
 
         const createdTickets = [];
 
