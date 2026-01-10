@@ -52,9 +52,12 @@ CRITICAL: You MUST respond with ONLY a valid JSON object, no other text. The for
 
 // Detect available CLI tool
 async function detectCLI(): Promise<'claude' | 'opencode' | null> {
+    const isWindows = process.platform === 'win32';
+    const whichCmd = isWindows ? 'where' : 'which';
+
     const checkCommand = (cmd: string): Promise<boolean> => {
         return new Promise((resolve) => {
-            const proc = spawn('which', [cmd], { shell: true });
+            const proc = spawn(whichCmd, [cmd], { shell: true });
             proc.on('close', (code) => resolve(code === 0));
             proc.on('error', () => resolve(false));
         });
@@ -89,9 +92,12 @@ Feature Request: ${request}`;
             args = ['--print', '--dangerously-skip-permissions'];
         }
 
+        // On Windows, shell: true is needed to find commands in PATH
+        const isWindows = process.platform === 'win32';
+
         const proc = spawn(cli, args, {
             cwd: projectPath,
-            shell: false,
+            shell: isWindows,
             env: { ...process.env },
             stdio: ['pipe', 'pipe', 'pipe'],
         });

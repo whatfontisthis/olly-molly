@@ -94,10 +94,13 @@ export function startBackgroundJob(params: StartJobParams): void {
         startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
     }
 
+    // On Windows, shell: true is needed to find commands in PATH
+    const isWindows = process.platform === 'win32';
+
     const agentProcess = spawn(execPath, args, {
         cwd: projectPath,
         env: { ...process.env, PORT: '3001' },
-        shell: false,
+        shell: isWindows,
         detached: false,
         stdio: ['pipe', 'pipe', 'pipe'],
     });
