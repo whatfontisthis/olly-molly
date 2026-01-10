@@ -46,6 +46,7 @@ export interface Member {
   role: 'PM' | 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS';
   name: string;
   avatar: string | null;
+  profile_image: string | null;
   system_prompt: string;
   created_at: string;
   updated_at: string;
@@ -148,7 +149,7 @@ export const memberService = {
     return this.getById(id);
   },
 
-  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'system_prompt'>>): Member | undefined {
+  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'profile_image' | 'system_prompt'>>): Member | undefined {
     const updates: string[] = [];
     const values: (string | null)[] = [];
 
@@ -159,6 +160,10 @@ export const memberService = {
     if (data.avatar !== undefined) {
       updates.push('avatar = ?');
       values.push(data.avatar);
+    }
+    if (data.profile_image !== undefined) {
+      updates.push('profile_image = ?');
+      values.push(data.profile_image);
     }
     if (data.system_prompt !== undefined) {
       updates.push('system_prompt = ?');

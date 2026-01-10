@@ -59,25 +59,52 @@ function getLocalVersion() {
     } catch { return null; }
 }
 
-function backupDB() {
-    const backupDir = path.join(os.tmpdir(), 'olly-molly-db-backup');
+const CUSTOM_PROFILES_DIR = path.join(APP_DIR, 'custom-profiles');
+
+function backupUserData() {
+    const backupDir = path.join(os.tmpdir(), 'olly-molly-backup');
+    fs.mkdirSync(backupDir, { recursive: true });
+    
+    // Backup database
     if (fs.existsSync(DB_DIR)) {
-        fs.cpSync(DB_DIR, backupDir, { recursive: true });
-        return backupDir;
+        const dbBackupDir = path.join(backupDir, 'db');
+        fs.cpSync(DB_DIR, dbBackupDir, { recursive: true });
     }
-    return null;
+    
+    // Backup custom profile images
+    if (fs.existsSync(CUSTOM_PROFILES_DIR)) {
+        const profilesBackupDir = path.join(backupDir, 'custom-profiles');
+        fs.cpSync(CUSTOM_PROFILES_DIR, profilesBackupDir, { recursive: true });
+    }
+    
+    return backupDir;
 }
 
-function restoreDB(backupDir) {
-    if (backupDir && fs.existsSync(backupDir)) {
+function restoreUserData(backupDir) {
+    if (!backupDir || !fs.existsSync(backupDir)) return;
+    
+    // Restore database
+    const dbBackupDir = path.join(backupDir, 'db');
+    if (fs.existsSync(dbBackupDir)) {
         fs.mkdirSync(DB_DIR, { recursive: true });
-        for (const file of fs.readdirSync(backupDir)) {
+        for (const file of fs.readdirSync(dbBackupDir)) {
             if (file.includes('.sqlite')) {
-                fs.copyFileSync(path.join(backupDir, file), path.join(DB_DIR, file));
+                fs.copyFileSync(path.join(dbBackupDir, file), path.join(DB_DIR, file));
             }
         }
-        fs.rmSync(backupDir, { recursive: true, force: true });
     }
+    
+    // Restore custom profile images
+    const profilesBackupDir = path.join(backupDir, 'custom-profiles');
+    if (fs.existsSync(profilesBackupDir)) {
+        fs.mkdirSync(CUSTOM_PROFILES_DIR, { recursive: true });
+        for (const file of fs.readdirSync(profilesBackupDir)) {
+            fs.copyFileSync(path.join(profilesBackupDir, file), path.join(CUSTOM_PROFILES_DIR, file));
+        }
+    }
+    
+    // Clean up backup
+    fs.rmSync(backupDir, { recursive: true, force: true });
 }
 
 async function main() {
@@ -90,12 +117,12 @@ async function main() {
     // Update if npm version is newer
     if (localVersion && npmVersion && localVersion !== npmVersion) {
         console.log(`🔄 Updating ${localVersion} → ${npmVersion}\n`);
-        const dbBackup = backupDB();
+        const userDataBackup = backupUserData();
         fs.rmSync(APP_DIR, { recursive: true, force: true });
         console.log('📥 Downloading...');
         await download(TARBALL_URL, APP_DIR);
         console.log('✅ Downloaded\n');
-        restoreDB(dbBackup);
+        restoreUserData(userDataBackup);
         needsInstall = true;
         needsBuild = true;
     }

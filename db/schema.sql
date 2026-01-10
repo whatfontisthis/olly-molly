@@ -4,10 +4,14 @@ CREATE TABLE IF NOT EXISTS members (
   role TEXT NOT NULL CHECK(role IN ('PM', 'FE_DEV', 'BACKEND_DEV', 'QA', 'DEVOPS')),
   name TEXT NOT NULL,
   avatar TEXT,
+  profile_image TEXT,
   system_prompt TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add profile_image column if it doesn't exist (for existing databases)
+-- Note: SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we use a separate migration approach
 
 -- Tickets
 CREATE TABLE IF NOT EXISTS tickets (

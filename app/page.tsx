@@ -321,7 +321,7 @@ export default function Dashboard() {
 
         {/* Team Sidebar */}
         <aside className={`
-          fixed right-0 top-[45px] bottom-0 w-72 bg-[var(--bg-secondary)] border-l border-[var(--border-primary)]
+          fixed right-0 top-[45px] bottom-0 w-1/2 bg-[var(--bg-secondary)] border-l border-[var(--border-primary)]
           p-4 transition-transform duration-200 overflow-hidden z-20
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
