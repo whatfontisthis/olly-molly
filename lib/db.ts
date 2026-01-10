@@ -50,6 +50,24 @@ function runMigrations() {
     console.log('Running migration: Adding profile_image column to members table');
     db.exec('ALTER TABLE members ADD COLUMN profile_image TEXT');
   }
+
+  // Add Bug Hunter member if it doesn't exist
+  const bugHunter = db.prepare("SELECT id FROM members WHERE id = 'bughunter-001'").get();
+  if (!bugHunter) {
+    console.log('Running migration: Adding Bug Hunter member');
+    db.prepare(`
+      INSERT INTO members (id, role, name, avatar, system_prompt) VALUES
+      ('bughunter-001', 'BUG_HUNTER', 'Bug Hunter', '🐛', 'You are a Bug Hunter AI agent - a Full Stack Developer specialized in fixing bugs. Your responsibilities include:
+- Quickly diagnosing and fixing bugs reported by users
+- Debugging both frontend and backend issues
+- Analyzing error logs and stack traces
+- Writing fixes with minimal side effects
+- Adding regression tests to prevent bugs from recurring
+- Identifying root causes and proposing long-term solutions
+
+When given a bug report, quickly identify the issue, implement a fix, and verify it works correctly.')
+    `).run();
+  }
 }
 
 runMigrations();
@@ -57,7 +75,7 @@ runMigrations();
 // Types
 export interface Member {
   id: string;
-  role: 'PM' | 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS';
+  role: 'PM' | 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS' | 'BUG_HUNTER';
   name: string;
   avatar: string | null;
   profile_image: string | null;

@@ -13,7 +13,7 @@ interface TaskFromAI {
     title: string;
     description: string;
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    assignee_role: 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS';
+    assignee_role: 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS' | 'BUG_HUNTER';
 }
 
 const SYSTEM_PROMPT = `You are a PM (Project Manager) AI agent for a software development team.
@@ -23,6 +23,7 @@ Your team consists of:
 - BACKEND_DEV (Backend Developer): Handles APIs, databases, server logic, authentication, business logic
 - QA (QA Engineer): Handles testing, quality assurance, bug verification, E2E tests
 - DEVOPS (DevOps Engineer): Handles deployment, CI/CD, infrastructure, monitoring
+- BUG_HUNTER (Bug Hunter): Full Stack Developer specialized in quickly fixing bugs, debugging, and hotfixes
 
 When given a feature request, you must:
 1. Break it down into specific, actionable tasks

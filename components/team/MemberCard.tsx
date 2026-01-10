@@ -35,14 +35,16 @@ const roleLabels: Record<string, string> = {
     BACKEND_DEV: 'Backend Developer',
     QA: 'QA Engineer',
     DEVOPS: 'DevOps Engineer',
+    BUG_HUNTER: 'Bug Hunter',
 };
 
-const roleColors: Record<string, 'default' | 'info' | 'success' | 'warning' | 'purple'> = {
+const roleColors: Record<string, 'default' | 'info' | 'success' | 'warning' | 'purple' | 'danger'> = {
     PM: 'purple',
     FE_DEV: 'info',
     BACKEND_DEV: 'success',
     QA: 'warning',
     DEVOPS: 'default',
+    BUG_HUNTER: 'danger',
 };
 
 function getProfileImage(member: Member): string | undefined {
