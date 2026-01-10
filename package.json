@@ -1,6 +1,6 @@
 {
   "name": "olly-molly",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Your AI Development Team, Running Locally - Manage AI agents (PM, Frontend, Backend, QA) from a beautiful kanban board",
   "keywords": [
     "ai",
@@ -27,15 +27,10 @@
   },
   "files": [
     "bin",
-    "app",
-    "components",
-    "db",
-    "lib",
+    ".next",
     "public",
-    "types",
+    "db/*.sql",
     "next.config.ts",
-    "postcss.config.mjs",
-    "tsconfig.json",
     "package.json"
   ],
   "scripts": {

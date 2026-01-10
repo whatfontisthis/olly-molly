@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -8,47 +8,36 @@ const packageDir = path.dirname(__dirname);
 
 console.log('\n🐙 Olly Molly - Your AI Development Team\n');
 
-// Check if node_modules exists, if not install
-const nodeModulesPath = path.join(packageDir, 'node_modules');
-if (!fs.existsSync(nodeModulesPath)) {
-    console.log('📦 Installing dependencies...\n');
-    try {
-        execSync('npm install', { 
-            cwd: packageDir, 
-            stdio: 'inherit' 
-        });
-    } catch (error) {
-        console.error('❌ Failed to install dependencies');
-        process.exit(1);
-    }
-}
-
-// Check if .next build exists, if not build
+// Check if .next build exists
 const nextPath = path.join(packageDir, '.next');
 if (!fs.existsSync(nextPath)) {
-    console.log('🔨 Building app...\n');
-    try {
-        execSync('npm run build', { 
-            cwd: packageDir, 
-            stdio: 'inherit' 
-        });
-    } catch (error) {
-        console.error('❌ Failed to build app');
-        process.exit(1);
-    }
+    console.error('❌ Build not found. Please report this issue.');
+    console.error('   The package should include a pre-built version.');
+    process.exit(1);
 }
 
-// Start the server
-console.log('🚀 Starting Olly Molly on http://localhost:1234\n');
+// Ensure db directory exists for SQLite
+const dbDir = path.join(packageDir, 'db');
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
 
-const server = spawn('npm', ['run', 'start', '--', '--port', '1234'], {
+console.log('🚀 Starting on http://localhost:1234\n');
+console.log('   Press Ctrl+C to stop\n');
+
+// Start the production server
+const server = spawn('npx', ['next', 'start', '--port', '1234'], {
     cwd: packageDir,
     stdio: 'inherit',
-    shell: true
+    shell: true,
+    env: {
+        ...process.env,
+        NODE_ENV: 'production'
+    }
 });
 
 server.on('error', (error) => {
-    console.error('❌ Failed to start server:', error.message);
+    console.error('❌ Failed to start:', error.message);
     process.exit(1);
 });
 
@@ -56,8 +45,9 @@ server.on('close', (code) => {
     process.exit(code || 0);
 });
 
-// Handle graceful shutdown
+// Graceful shutdown
 process.on('SIGINT', () => {
+    console.log('\n👋 Shutting down...');
     server.kill('SIGINT');
 });
 
