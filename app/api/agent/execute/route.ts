@@ -28,18 +28,15 @@ function buildAgentPrompt(ticket: {
 2. TOOL USAGE: You MUST use the **Playwright MCP** (https://github.com/microsoft/playwright-mcp) tools for automated testing. verify the available tools and use them for browser automation and testing. Do NOT rely solely on manual terminal commands.`
         : '';
 
-    // Check if role is FE_DEV to add screenshot instructions
-    const isFrontend = agent.role === 'FE_DEV';
-    const screenshotInstruction = isFrontend
-        ? `\n\nSCREENSHOT REQUIREMENT:
-After completing your UI changes, you MUST take screenshots to document your work:
+    // Screenshot instruction for all agents
+    const screenshotInstruction = `\n\nSCREENSHOT REQUIREMENT:
+If you make any UI/visual changes, you MUST take screenshots to document your work:
 1. Start the dev server with PORT=3001 (e.g., "PORT=3001 npm run dev")
 2. Use browser automation tools (Playwright MCP or similar) to capture screenshots
 3. Save screenshots to the ".agent-screenshots/" folder in the project root
-4. Name files descriptively (e.g., "login-page-updated.png", "dashboard-new-layout.png")
+4. Name files descriptively (e.g., "feature-result.png", "bug-fix-result.png")
 5. Include multiple screenshots if you changed multiple pages/components
-This is MANDATORY for all frontend changes so other agents can reference your visual changes.`
-        : '';
+This is MANDATORY for visual changes so other agents can reference your work.`;
 
     const feedbackSection = feedback
         ? `\n\nIMPORTANT FEEDBACK FROM USER:\n${feedback}\n\nPlease address this feedback specifically in your implementation.`

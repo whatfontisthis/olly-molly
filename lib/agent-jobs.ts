@@ -194,37 +194,93 @@ function extractSummary(output: string): string {
     // Remove ANSI escape codes
     const cleanOutput = output.replace(/\x1B\[[0-9;]*[mK]/g, '');
 
-    // Look for common summary patterns
-    const lines = cleanOutput.split('\n').filter(line => line.trim());
+    // Lines to filter out (git noise, system messages, etc.)
+    const noisePatterns = [
+        /^changes not staged/i,
+        /^use "git/i,
+        /^\(use "git/i,
+        /^modified:\s+/i,
+        /^deleted:\s+/i,
+        /^new file:\s+/i,
+        /^on branch/i,
+        /^your branch/i,
+        /^nothing to commit/i,
+        /^untracked files/i,
+        /^changes to be committed/i,
+        /^\s*$/,
+        /^#/,
+        /^\[.*\]$/,
+        /^🚀/,
+        /^✅/,
+        /^❌/,
+        /^Starting/i,
+        /^Running/i,
+        /^Executing/i,
+    ];
 
-    // Try to find commit message or summary section
-    const summaryIndicators = ['summary', 'changes', 'completed', 'done', 'created', 'updated', 'fixed', 'added'];
-    const relevantLines: string[] = [];
+    const lines = cleanOutput.split('\n').filter(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return false;
+        return !noisePatterns.some(pattern => pattern.test(trimmed));
+    });
+
+    // Priority 1: Look for explicit summary section or commit message
+    const summaryPatterns = [
+        /^#+\s*summary/i,
+        /^summary:/i,
+        /completed.*:/i,
+        /작업.*완료/i,
+        /구현.*:/i,
+        /변경.*:/i,
+    ];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].toLowerCase();
-        if (summaryIndicators.some(indicator => line.includes(indicator))) {
-            // Include this line and next few lines
-            relevantLines.push(lines[i]);
-            for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
-                if (lines[j].trim() && !lines[j].startsWith('[')) {
-                    relevantLines.push(lines[j]);
+        const line = lines[i].trim();
+        if (summaryPatterns.some(pattern => pattern.test(line))) {
+            // Found a summary section, grab next few lines
+            const summaryLines = [line];
+            for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                if (lines[j].trim()) {
+                    summaryLines.push(lines[j].trim());
                 }
             }
+            return summaryLines.map(l => `- ${l}`).join('\n');
         }
     }
 
-    if (relevantLines.length > 0) {
-        return relevantLines.slice(0, 5).map(l => `- ${l.trim()}`).join('\n');
+    // Priority 2: Look for action verbs indicating completed work
+    const actionPatterns = [
+        /^(created|added|updated|fixed|implemented|removed|refactored|modified)/i,
+        /^(생성|추가|수정|구현|삭제|변경|완료)/,
+    ];
+
+    const actionLines = lines.filter(line =>
+        actionPatterns.some(pattern => pattern.test(line.trim()))
+    );
+
+    if (actionLines.length > 0) {
+        return actionLines.slice(0, 5).map(l => `- ${l.trim()}`).join('\n');
     }
 
-    // Fallback: take last 5 non-empty lines that aren't system messages
-    const fallbackLines = lines
-        .filter(l => !l.startsWith('[') && !l.startsWith('🚀') && !l.startsWith('✅') && !l.startsWith('❌'))
+    // Priority 3: Look for file-related actions (but not git status noise)
+    const fileActionLines = lines.filter(line => {
+        const l = line.toLowerCase();
+        return (l.includes('.tsx') || l.includes('.ts') || l.includes('.css') || l.includes('.json'))
+            && !l.includes('modified:')
+            && !l.includes('use "git');
+    });
+
+    if (fileActionLines.length > 0) {
+        return fileActionLines.slice(0, 5).map(l => `- ${l.trim()}`).join('\n');
+    }
+
+    // Priority 4: Get last meaningful lines as fallback
+    const lastMeaningfulLines = lines
+        .filter(l => l.trim().length > 10) // Only lines with substantial content
         .slice(-5);
 
-    if (fallbackLines.length > 0) {
-        return fallbackLines.map(l => `- ${l.trim()}`).join('\n');
+    if (lastMeaningfulLines.length > 0) {
+        return lastMeaningfulLines.map(l => `- ${l.trim()}`).join('\n');
     }
 
     return '- 작업 완료됨';
