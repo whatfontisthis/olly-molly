@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 interface AddMemberModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (member: { role: string; name: string; avatar: string; system_prompt: string; can_generate_images?: boolean }) => void;
+    onSave: (member: { role: string; name: string; avatar: string; system_prompt: string; can_generate_images?: boolean; can_log_screenshots?: boolean }) => void;
 }
 
 const roleOptions = [
@@ -36,15 +36,18 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
     const [avatar, setAvatar] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
     const [canGenerateImages, setCanGenerateImages] = useState(false);
+    const [canLogScreenshots, setCanLogScreenshots] = useState(false);
 
-    const handleRoleSelect = (selectedRole: string, emoji: string, prompt: string) => {
+    const handleRoleSelect = (selectedRole: string, emoji: string, prompt: string, roleValue?: string) => {
         setRole(selectedRole);
         setSystemPrompt(prompt);
         if (!avatar) {
             setAvatar(emoji);
         }
+        const resolvedRole = roleValue ?? selectedRole;
         // Auto-enable for FE_DEV and BUG_HUNTER based on previous logic, but allow toggle
-        setCanGenerateImages(selectedRole === 'FE_DEV' || selectedRole === 'Bug Hunter');
+        setCanGenerateImages(resolvedRole === 'FE_DEV' || resolvedRole === 'BUG_HUNTER');
+        setCanLogScreenshots(resolvedRole === 'FE_DEV' || resolvedRole === 'QA');
     };
 
     const handleSave = () => {
@@ -54,7 +57,8 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
                 name: name.trim(),
                 avatar: avatar.trim() || '👤',
                 system_prompt: systemPrompt.trim(),
-                can_generate_images: canGenerateImages
+                can_generate_images: canGenerateImages,
+                can_log_screenshots: canLogScreenshots
             });
             // Reset form
             setRole('');
@@ -62,6 +66,7 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
             setAvatar('');
             setSystemPrompt('');
             setCanGenerateImages(false);
+            setCanLogScreenshots(false);
             onClose();
         }
     };
@@ -73,6 +78,7 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
         setAvatar('');
         setSystemPrompt('');
         setCanGenerateImages(false);
+        setCanLogScreenshots(false);
         onClose();
     };
 
@@ -97,7 +103,7 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
                             <button
                                 key={option.value}
                                 type="button"
-                                onClick={() => handleRoleSelect(option.label, option.emoji, defaultPrompts[option.value])}
+                                onClick={() => handleRoleSelect(option.label, option.emoji, defaultPrompts[option.value], option.value)}
                                 className="px-2 py-1 text-xs rounded-md bg-[var(--bg-tertiary)] hover:bg-[var(--bg-card-hover)] 
                                          border border-[var(--border-primary)] transition-colors"
                             >
@@ -138,6 +144,21 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
                     </label>
                     <span className="text-xs text-[var(--text-tertiary)] ml-auto">
                         Requires configured image settings
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                    <input
+                        type="checkbox"
+                        id="canLogScreenshots"
+                        checked={canLogScreenshots}
+                        onChange={(e) => setCanLogScreenshots(e.target.checked)}
+                        className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                    />
+                    <label htmlFor="canLogScreenshots" className="text-sm font-medium text-[var(--text-primary)] cursor-pointer select-none">
+                        📸 Allow Screenshot Logging
+                    </label>
+                    <span className="text-xs text-[var(--text-tertiary)] ml-auto">
+                        Adds screenshot requirement to agent prompt
                     </span>
                 </div>
 

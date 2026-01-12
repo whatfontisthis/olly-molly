@@ -17,6 +17,7 @@ interface Member {
     system_prompt: string;
     is_default: number;
     can_generate_images: number;
+    can_log_screenshots: number;
 }
 
 interface MemberCardProps {
@@ -94,7 +95,7 @@ interface SystemPromptEditorProps {
     isOpen: boolean;
     onClose: () => void;
     member: Member | null;
-    onSave: (id: string, systemPrompt: string) => void;
+    onSave: (member: Member) => void;
     onProfileImageChange?: (id: string, imagePath: string) => void;
     onDelete?: (id: string) => void;
 }
@@ -103,6 +104,7 @@ interface SystemPromptEditorProps {
 export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileImageChange, onDelete }: SystemPromptEditorProps) {
     const [prompt, setPrompt] = useState(member?.system_prompt || '');
     const [canGenerateImages, setCanGenerateImages] = useState(member?.can_generate_images === 1);
+    const [canLogScreenshots, setCanLogScreenshots] = useState(member?.can_log_screenshots === 1);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -115,6 +117,7 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
         if (member && isOpen) {
             setPrompt(member.system_prompt);
             setCanGenerateImages(member.can_generate_images === 1);
+            setCanLogScreenshots(member.can_log_screenshots === 1);
         }
     }, [member, isOpen]);
 
@@ -138,17 +141,22 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
             // Let's rely on parallel update for now:
 
             try {
-                await fetch(`/api/members/${member.id}`, {
+                const response = await fetch(`/api/members/${member.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system_prompt: prompt,
-                        can_generate_images: canGenerateImages ? 1 : 0
+                        can_generate_images: canGenerateImages ? 1 : 0,
+                        can_log_screenshots: canLogScreenshots ? 1 : 0
                     }),
                 });
 
-                // Trigger parent refresh/update
-                onSave(member.id, prompt); // This triggers local state update in page
+                if (!response.ok) {
+                    throw new Error('Failed to update member');
+                }
+
+                const updatedMember = await response.json();
+                onSave(updatedMember);
                 onClose();
             } catch (error) {
                 console.error('Failed to update member:', error);
@@ -316,6 +324,21 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
                         </label>
                         <span className="text-xs text-[var(--text-tertiary)] ml-auto">
                             Requires configured image settings
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                        <input
+                            type="checkbox"
+                            id="editCanLogScreenshots"
+                            checked={canLogScreenshots}
+                            onChange={(e) => setCanLogScreenshots(e.target.checked)}
+                            className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                        />
+                        <label htmlFor="editCanLogScreenshots" className="text-sm font-medium text-[var(--text-primary)] cursor-pointer select-none">
+                            📸 Allow Screenshot Logging
+                        </label>
+                        <span className="text-xs text-[var(--text-tertiary)] ml-auto">
+                            Adds screenshot requirement to agent prompt
                         </span>
                     </div>
 

@@ -17,6 +17,7 @@ function buildAgentPrompt(ticket: {
     role: string;
     system_prompt: string;
     can_generate_images: number;
+    can_log_screenshots: number;
 }, project: {
     name: string;
     path: string;
@@ -44,15 +45,17 @@ If you need images for your implementation (backgrounds, icons, illustrations, e
 - If you get an error about settings not configured, skip image generation`
         : '';
 
-    // Screenshot instruction for all agents
-    const screenshotInstruction = `\n\nSCREENSHOT REQUIREMENT:
+    const canLogScreenshots = agent.can_log_screenshots === 1;
+    const screenshotInstruction = canLogScreenshots
+        ? `\n\nSCREENSHOT REQUIREMENT:
 If you make any UI/visual changes, you MUST take screenshots to document your work:
 1. Start the dev server with PORT=3001 (e.g., "PORT=3001 npm run dev")
 2. Use browser automation tools (Playwright MCP or similar) to capture screenshots
 3. Save screenshots to the ".agent-screenshots/" folder in the project root
 4. Name files descriptively (e.g., "feature-result.png", "bug-fix-result.png")
 5. Include multiple screenshots if you changed multiple pages/components
-This is MANDATORY for visual changes so other agents can reference your work.`;
+This is MANDATORY for visual changes so other agents can reference your work.`
+        : '';
 
     const feedbackSection = feedback
         ? `\n\nIMPORTANT FEEDBACK FROM USER:\n${feedback}\n\nPlease address this feedback specifically in your implementation.`

@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { role, name, avatar, system_prompt, can_generate_images } = body;
+        const { role, name, avatar, system_prompt, can_generate_images, can_log_screenshots } = body;
 
         // Validation
         if (!role || !name || !system_prompt) {
@@ -29,7 +29,8 @@ export async function POST(request: Request) {
             name,
             avatar,
             system_prompt,
-            can_generate_images: can_generate_images === true || can_generate_images === 1
+            can_generate_images: can_generate_images === true || can_generate_images === 1,
+            can_log_screenshots: can_log_screenshots === true || can_log_screenshots === 1
         });
         return NextResponse.json(newMember, { status: 201 });
     } catch (error) {

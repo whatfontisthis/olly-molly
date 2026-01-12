@@ -28,6 +28,7 @@ interface Member {
   system_prompt: string;
   is_default: number;
   can_generate_images: number; // Added as per instruction
+  can_log_screenshots: number;
   created_at?: string; // Added based on common pattern for timestamps
   updated_at?: string; // Added based on common pattern for timestamps
 }
@@ -135,8 +136,10 @@ export default function Dashboard() {
       });
       const newTicket = await res.json();
       setTickets(prev => [newTicket, ...prev]);
+      return newTicket as Ticket;
     } catch (error) {
       console.error('Failed to create ticket:', error);
+      return null;
     }
   }, [activeProject]);
 
@@ -163,21 +166,11 @@ export default function Dashboard() {
     }
   }, []);
 
-  const handleMemberUpdate = useCallback(async (id: string, systemPrompt: string) => {
-    try {
-      const res = await fetch(`/api/members/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system_prompt: systemPrompt }),
-      });
-      const updatedMember = await res.json();
-      setMembers(prev => prev.map(m => m.id === id ? updatedMember : m));
-    } catch (error) {
-      console.error('Failed to update member:', error);
-    }
+  const handleMemberUpdate = useCallback((updatedMember: Member) => {
+    setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
   }, []);
 
-  const handleMemberCreate = useCallback(async (data: { role: string; name: string; avatar: string; system_prompt: string }) => {
+  const handleMemberCreate = useCallback(async (data: { role: string; name: string; avatar: string; system_prompt: string; can_generate_images?: boolean; can_log_screenshots?: boolean }) => {
     try {
       const res = await fetch('/api/members', {
         method: 'POST',
@@ -223,8 +216,16 @@ export default function Dashboard() {
 
 
 
-  const handleCreateTicket = () => {
-    handleTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
+  const handleCreateTicket = async () => {
+    const newTicket = await handleTicketCreate({
+      title: 'New Ticket',
+      status: 'TODO',
+      priority: 'MEDIUM'
+    });
+    if (newTicket) {
+      setSelectedTicket(newTicket);
+      setTicketSidebarOpen(true);
+    }
   };
 
   const runningCount = runningJobs.filter(j => j.status === 'running').length;

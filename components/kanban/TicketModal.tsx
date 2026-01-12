@@ -18,6 +18,7 @@ interface Member {
     system_prompt: string;
     is_default: number;
     can_generate_images: number;
+    can_log_screenshots: number;
 }
 
 interface Ticket {
@@ -59,8 +60,8 @@ interface TicketModalProps {
     onClose: () => void;
     ticket?: Ticket | null;
     members: Member[];
-    onSave: (data: Partial<Ticket>) => void;
-    onDelete?: () => void;
+    onSave: (data: Partial<Ticket>) => void | Promise<void>;
+    onDelete?: () => void | Promise<void>;
     hasActiveProject?: boolean;
     onTicketStatusChange?: () => void;
 }

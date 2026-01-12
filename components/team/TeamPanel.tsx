@@ -13,12 +13,13 @@ interface Member {
     system_prompt: string;
     is_default: number;
     can_generate_images: number;
+    can_log_screenshots: number;
 }
 
 interface TeamPanelProps {
     members: Member[];
-    onUpdateMember: (id: string, systemPrompt: string) => void;
-    onCreateMember: (data: { role: string; name: string; avatar: string; system_prompt: string }) => void;
+    onUpdateMember: (member: Member) => void;
+    onCreateMember: (data: { role: string; name: string; avatar: string; system_prompt: string; can_generate_images?: boolean; can_log_screenshots?: boolean }) => void;
     onDeleteMember: (id: string) => void;
 }
 
@@ -32,8 +33,8 @@ export function TeamPanel({ members, onUpdateMember, onCreateMember, onDeleteMem
         setIsEditorOpen(true);
     };
 
-    const handleSave = (id: string, systemPrompt: string) => {
-        onUpdateMember(id, systemPrompt);
+    const handleSave = (member: Member) => {
+        onUpdateMember(member);
     };
 
     return (

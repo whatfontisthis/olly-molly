@@ -25,6 +25,7 @@ interface Member {
     system_prompt: string;
     is_default: number;
     can_generate_images: number;
+    can_log_screenshots: number;
 }
 
 interface Ticket {
@@ -47,9 +48,9 @@ interface RunningJob {
 interface KanbanBoardProps {
     tickets: Ticket[];
     members: Member[];
-    onTicketUpdate: (id: string, data: Partial<Ticket>) => void;
-    onTicketCreate: (data: Partial<Ticket>) => void;
-    onTicketDelete: (id: string) => void;
+    onTicketUpdate: (id: string, data: Partial<Ticket>) => void | Promise<void>;
+    onTicketCreate: (data: Partial<Ticket>) => void | Promise<void>;
+    onTicketDelete: (id: string) => void | Promise<void>;
     onTicketsReorder?: (tickets: Ticket[]) => void;
     hasActiveProject?: boolean;
     onRefresh?: () => void;

@@ -51,7 +51,18 @@ function initializeDatabase(db: DatabaseType) {
   if (!fs.existsSync(schemaPath)) return;
 
   const schema = fs.readFileSync(schemaPath, 'utf-8');
-  db.exec(schema);
+  try {
+    db.exec(schema);
+  } catch (error) {
+    const message = String(error);
+    if (message.includes('no column named')) {
+      console.warn('[db] Schema insert failed due to missing columns, running migrations and retrying...');
+      runMigrations(db);
+      db.exec(schema);
+    } else {
+      throw error;
+    }
+  }
 
   // Load projects schema if exists
   const projectsSchemaPath = path.join(process.cwd(), 'db', 'schema-projects.sql');
@@ -73,6 +84,8 @@ function runMigrations(db: DatabaseType) {
   // Check if profile_image column exists in members table
   const tableInfo = db.prepare("PRAGMA table_info(members)").all() as { name: string }[];
   const hasProfileImage = tableInfo.some(col => col.name === 'profile_image');
+  const hasCanGenerateImages = tableInfo.some(col => col.name === 'can_generate_images');
+  const hasCanLogScreenshots = tableInfo.some(col => col.name === 'can_log_screenshots');
 
   if (!hasProfileImage) {
     console.log('Running migration: Adding profile_image column to members table');
@@ -91,6 +104,24 @@ function runMigrations(db: DatabaseType) {
     const placeholders = defaultMemberIds.map(() => '?').join(',');
     db.prepare(`UPDATE members SET is_default = 1 WHERE id IN (${placeholders})`).run(...defaultMemberIds);
     console.log('Migration: Marked default members with is_default = 1');
+  }
+
+  if (!hasCanGenerateImages) {
+    console.log('Running migration: Adding can_generate_images column to members table');
+    db.exec('ALTER TABLE members ADD COLUMN can_generate_images INTEGER DEFAULT 0');
+
+    const defaultImageMemberIds = ['fe-001', 'bughunter-001'];
+    const placeholders = defaultImageMemberIds.map(() => '?').join(',');
+    db.prepare(`UPDATE members SET can_generate_images = 1 WHERE id IN (${placeholders})`).run(...defaultImageMemberIds);
+  }
+
+  if (!hasCanLogScreenshots) {
+    console.log('Running migration: Adding can_log_screenshots column to members table');
+    db.exec('ALTER TABLE members ADD COLUMN can_log_screenshots INTEGER DEFAULT 0');
+
+    const defaultScreenshotMemberIds = ['fe-001', 'qa-001'];
+    const placeholders = defaultScreenshotMemberIds.map(() => '?').join(',');
+    db.prepare(`UPDATE members SET can_log_screenshots = 1 WHERE id IN (${placeholders})`).run(...defaultScreenshotMemberIds);
   }
 
   // Check if CHECK constraint needs updating for BUG_HUNTER role
@@ -114,13 +145,16 @@ function runMigrations(db: DatabaseType) {
           avatar TEXT,
           profile_image TEXT,
           system_prompt TEXT NOT NULL,
+          is_default INTEGER DEFAULT 0,
+          can_generate_images INTEGER DEFAULT 0,
+          can_log_screenshots INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
         -- Copy existing data
-        INSERT OR IGNORE INTO members_new (id, role, name, avatar, profile_image, system_prompt, created_at, updated_at)
-        SELECT id, role, name, avatar, profile_image, system_prompt, created_at, updated_at FROM members;
+        INSERT OR IGNORE INTO members_new (id, role, name, avatar, profile_image, system_prompt, is_default, can_generate_images, can_log_screenshots, created_at, updated_at)
+        SELECT id, role, name, avatar, profile_image, system_prompt, is_default, can_generate_images, can_log_screenshots, created_at, updated_at FROM members;
 
         -- Drop old table
         DROP TABLE members;
@@ -166,6 +200,7 @@ export interface Member {
   system_prompt: string;
   is_default: number;
   can_generate_images: number;
+  can_log_screenshots: number;
   created_at: string;
   updated_at: string;
 }
@@ -267,7 +302,7 @@ export const memberService = {
     return this.getById(id);
   },
 
-  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'profile_image' | 'system_prompt' | 'can_generate_images'>>): Member | undefined {
+  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'profile_image' | 'system_prompt' | 'can_generate_images' | 'can_log_screenshots'>>): Member | undefined {
     const updates: string[] = [];
     const values: (string | null)[] = [];
 
@@ -291,6 +326,10 @@ export const memberService = {
       updates.push('can_generate_images = ?');
       values.push(data.can_generate_images ? '1' : '0');
     }
+    if (data.can_log_screenshots !== undefined) {
+      updates.push('can_log_screenshots = ?');
+      values.push(data.can_log_screenshots ? '1' : '0');
+    }
 
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
@@ -301,13 +340,14 @@ export const memberService = {
     return this.getById(id);
   },
 
-  create(data: { role: string; name: string; avatar?: string; system_prompt: string; can_generate_images?: boolean }): Member {
+  create(data: { role: string; name: string; avatar?: string; system_prompt: string; can_generate_images?: boolean; can_log_screenshots?: boolean }): Member {
     const id = uuidv4();
     const canGenerate = data.can_generate_images ? 1 : 0;
+    const canLogScreenshots = data.can_log_screenshots ? 1 : 0;
     getDb().prepare(`
-      INSERT INTO members (id, role, name, avatar, system_prompt, is_default, can_generate_images)
-      VALUES (?, ?, ?, ?, ?, 0, ?)
-    `).run(id, data.role, data.name, data.avatar || null, data.system_prompt, canGenerate);
+      INSERT INTO members (id, role, name, avatar, system_prompt, is_default, can_generate_images, can_log_screenshots)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+    `).run(id, data.role, data.name, data.avatar || null, data.system_prompt, canGenerate, canLogScreenshots);
     return this.getById(id)!;
   },
 
