@@ -11,6 +11,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
     const [running, setRunning] = useState(false);
     const [port, setPort] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+    const [external, setExternal] = useState(false); // True if server was started externally
 
     // Check server status
     const checkStatus = useCallback(async () => {
@@ -21,6 +22,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
             const data = await res.json();
             setRunning(data.running);
             setPort(data.port || null);
+            setExternal(data.external || false);
         } catch (error) {
             console.error('Failed to check dev server status:', error);
         }
@@ -37,6 +39,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
     useEffect(() => {
         setRunning(false);
         setPort(null);
+        setExternal(false);
         checkStatus();
     }, [projectId, checkStatus]);
 
@@ -55,6 +58,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
             if (data.success) {
                 setRunning(true);
                 setPort(data.port);
+                setExternal(false);
             } else {
                 alert(data.error || 'Failed to start dev server');
             }
@@ -103,8 +107,8 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
                     onClick={handleStart}
                     disabled={loading}
                     className={`p-1.5 rounded-lg transition-colors ${loading
-                            ? 'text-[var(--text-muted)] cursor-not-allowed'
-                            : 'text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300'
+                        ? 'text-[var(--text-muted)] cursor-not-allowed'
+                        : 'text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300'
                         }`}
                     title="Start dev server (npm run dev)"
                 >
@@ -121,9 +125,15 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
                 </button>
             ) : (
                 <>
-                    <span className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-500/10 text-emerald-400 rounded">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${external
+                            ? 'bg-amber-500/10 text-amber-400'
+                            : 'bg-emerald-500/10 text-emerald-400'
+                        }`}
+                        title={external ? 'Running externally (started from terminal)' : 'Running from dashboard'}
+                    >
+                        <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${external ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                         :{port}
+                        {external && <span className="text-[10px] opacity-70">ext</span>}
                     </span>
                     <button
                         onClick={handleOpen}
@@ -134,19 +144,21 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                     </button>
-                    <button
-                        onClick={handleStop}
-                        disabled={loading}
-                        className={`p-1.5 rounded-lg transition-colors ${loading
+                    {!external && (
+                        <button
+                            onClick={handleStop}
+                            disabled={loading}
+                            className={`p-1.5 rounded-lg transition-colors ${loading
                                 ? 'text-[var(--text-muted)] cursor-not-allowed'
                                 : 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-                            }`}
-                        title="Stop dev server"
-                    >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <rect x="6" y="6" width="12" height="12" rx="1" />
-                        </svg>
-                    </button>
+                                }`}
+                            title="Stop dev server"
+                        >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <rect x="6" y="6" width="12" height="12" rx="1" />
+                            </svg>
+                        </button>
+                    )}
                 </>
             )}
         </div>

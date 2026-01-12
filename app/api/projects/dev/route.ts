@@ -5,12 +5,94 @@ import fs from 'fs';
 import os from 'os';
 import { projectService } from '@/lib/db';
 
+import { execSync } from 'child_process';
+
 // Track running dev servers: projectId -> process info
 const runningDevServers = new Map<string, {
     process: ChildProcess;
     port: number;
     output: string;
 }>();
+
+/**
+ * Detect externally running dev server for a project
+ * Uses lsof to find node processes with cwd matching the project path
+ * and then checks which port they are listening on
+ */
+function detectExternalDevServer(projectPath: string): { running: boolean; port?: number; pid?: number } {
+    try {
+        const isWindows = process.platform === 'win32';
+
+        if (isWindows) {
+            // Windows detection is more complex, skip for now
+            return { running: false };
+        }
+
+        // Step 1: Find node processes with cwd in project path
+        // lsof -c node -a -d cwd outputs lines like:
+        // node    95847 user  cwd    DIR   1,13  544 96780203 /path/to/project
+        let cwdResult: string;
+        try {
+            cwdResult = execSync(`lsof -c node -a -d cwd 2>/dev/null | grep "${projectPath}"`, {
+                encoding: 'utf-8',
+                timeout: 5000,
+            });
+        } catch {
+            // No matching processes
+            return { running: false };
+        }
+
+        if (!cwdResult.trim()) {
+            return { running: false };
+        }
+
+        // Parse PIDs from the result
+        const lines = cwdResult.trim().split('\n');
+        const pids = new Set<number>();
+        for (const line of lines) {
+            const parts = line.split(/\s+/);
+            if (parts.length >= 2) {
+                const pid = parseInt(parts[1], 10);
+                if (!isNaN(pid)) {
+                    pids.add(pid);
+                }
+            }
+        }
+
+        if (pids.size === 0) {
+            return { running: false };
+        }
+
+        // Step 2: Find which port these processes are listening on
+        for (const pid of pids) {
+            try {
+                const listenResult = execSync(`lsof -i -P -n -a -p ${pid} 2>/dev/null | grep LISTEN`, {
+                    encoding: 'utf-8',
+                    timeout: 5000,
+                });
+
+                // Parse port from output like:
+                // node    95847 user   13u  IPv6 ... TCP *:3001 (LISTEN)
+                const portMatch = listenResult.match(/:(\d+)\s+\(LISTEN\)/);
+                if (portMatch) {
+                    const port = parseInt(portMatch[1], 10);
+                    if (!isNaN(port)) {
+                        return { running: true, port, pid };
+                    }
+                }
+            } catch {
+                // This PID is not listening on any port, try next
+                continue;
+            }
+        }
+
+        // Processes found but no listening port detected
+        return { running: true, pid: Array.from(pids)[0] };
+    } catch (error) {
+        console.error('Error detecting external dev server:', error);
+        return { running: false };
+    }
+}
 
 // Find available port
 async function findAvailablePort(startPort: number = 3000): Promise<number> {
@@ -251,7 +333,23 @@ export async function GET(request: NextRequest) {
             running: true,
             port: server.port,
             url: `http://localhost:${server.port}`,
+            external: false,
         });
+    }
+
+    // Check for externally running dev server
+    const project = projectService.getById(projectId);
+    if (project) {
+        const externalServer = detectExternalDevServer(project.path);
+        if (externalServer.running && externalServer.port) {
+            return NextResponse.json({
+                running: true,
+                port: externalServer.port,
+                url: `http://localhost:${externalServer.port}`,
+                external: true,
+                pid: externalServer.pid,
+            });
+        }
     }
 
     return NextResponse.json({ running: false });
