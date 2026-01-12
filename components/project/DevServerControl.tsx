@@ -5,9 +5,10 @@ import { useState, useEffect, useCallback } from 'react';
 interface DevServerControlProps {
     projectId: string | null;
     projectName: string | null;
+    relativePath?: string | null;
 }
 
-export function DevServerControl({ projectId, projectName }: DevServerControlProps) {
+export function DevServerControl({ projectId, projectName, relativePath }: DevServerControlProps) {
     const [running, setRunning] = useState(false);
     const [port, setPort] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
@@ -18,7 +19,11 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
         if (!projectId) return;
 
         try {
-            const res = await fetch(`/api/projects/dev?projectId=${projectId}`);
+            const params = new URLSearchParams({ projectId });
+            if (relativePath) {
+                params.set('path', relativePath);
+            }
+            const res = await fetch(`/api/projects/dev?${params.toString()}`);
             const data = await res.json();
             setRunning(data.running);
             setPort(data.port || null);
@@ -26,7 +31,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
         } catch (error) {
             console.error('Failed to check dev server status:', error);
         }
-    }, [projectId]);
+    }, [projectId, relativePath]);
 
     useEffect(() => {
         checkStatus();
@@ -41,7 +46,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
         setPort(null);
         setExternal(false);
         checkStatus();
-    }, [projectId, checkStatus]);
+    }, [projectId, relativePath, checkStatus]);
 
     const handleStart = async () => {
         if (!projectId) return;
@@ -51,7 +56,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
             const res = await fetch('/api/projects/dev', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'start', projectId }),
+                body: JSON.stringify({ action: 'start', projectId, path: relativePath || undefined }),
             });
 
             const data = await res.json();
@@ -77,7 +82,7 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
             const res = await fetch('/api/projects/dev', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'stop', projectId }),
+                body: JSON.stringify({ action: 'stop', projectId, path: relativePath || undefined }),
             });
 
             const data = await res.json();

@@ -6,7 +6,7 @@ import { KanbanBoard, TicketSidebar } from '@/components/kanban';
 import { TeamPanel } from '@/components/team';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PMRequestModal } from '@/components/pm';
-import { ProjectSelector, DevServerControl } from '@/components/project';
+import { ProjectSelector, DevServerControl, ProjectArtifactsModal } from '@/components/project';
 import { Button } from '@/components/ui/Button';
 import { ResizablePane } from '@/components/ui/ResizablePane';
 
@@ -58,6 +58,7 @@ export default function Dashboard() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketSidebarOpen, setTicketSidebarOpen] = useState(false);
+  const [artifactsModalOpen, setArtifactsModalOpen] = useState(false);
 
   const [cliWarningModalOpen, setCliWarningModalOpen] = useState(false);
   const [imageSettingsModalOpen, setImageSettingsModalOpen] = useState(false);
@@ -266,6 +267,13 @@ export default function Dashboard() {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => setArtifactsModalOpen(true)}
+            >
+              파일 탐색
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setPmModalOpen(true)}
             >
               PM 요청
@@ -363,6 +371,14 @@ export default function Dashboard() {
           />
         </aside>
       </div>
+
+      <ProjectArtifactsModal
+        isOpen={artifactsModalOpen}
+        onClose={() => setArtifactsModalOpen(false)}
+        projectId={activeProject?.id || null}
+        projectName={activeProject?.name || null}
+        projectPath={activeProject?.path || null}
+      />
 
       {/* PM Request Modal */}
       <PMRequestModal

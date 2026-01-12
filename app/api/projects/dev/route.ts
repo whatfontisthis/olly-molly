@@ -1,17 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { projectService } from '@/lib/db';
 
-import { execSync } from 'child_process';
+const ROOT_RELATIVE_PATH = '.';
 
-// Track running dev servers: projectId -> process info
+function normalizeRelativePath(relativePath?: string | null): string {
+    if (!relativePath) return ROOT_RELATIVE_PATH;
+    const normalized = relativePath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+    return normalized || ROOT_RELATIVE_PATH;
+}
+
+function getServerKey(projectId: string, relativePath?: string | null): string {
+    return `${projectId}:${normalizeRelativePath(relativePath)}`;
+}
+
+function resolveProjectPath(projectRoot: string, relativePath?: string | null): string {
+    const root = path.resolve(projectRoot);
+    const normalized = normalizeRelativePath(relativePath);
+    const resolved = path.resolve(root, normalized);
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+        throw new Error('Invalid path');
+    }
+    return resolved;
+}
+
+// Track running dev servers: projectId+path -> process info
 const runningDevServers = new Map<string, {
     process: ChildProcess;
     port: number;
     output: string;
+    projectId: string;
+    relativePath: string;
 }>();
 
 /**
@@ -19,7 +41,7 @@ const runningDevServers = new Map<string, {
  * Uses lsof to find node processes with cwd matching the project path
  * and then checks which port they are listening on
  */
-function detectExternalDevServer(projectPath: string): { running: boolean; port?: number; pid?: number } {
+function detectExternalDevServer(targetPath: string): { running: boolean; port?: number; pid?: number } {
     try {
         const isWindows = process.platform === 'win32';
 
@@ -28,32 +50,31 @@ function detectExternalDevServer(projectPath: string): { running: boolean; port?
             return { running: false };
         }
 
-        // Step 1: Find node processes with cwd in project path
+        // Step 1: Find node processes with cwd matching target path
         // lsof -c node -a -d cwd outputs lines like:
         // node    95847 user  cwd    DIR   1,13  544 96780203 /path/to/project
         let cwdResult: string;
         try {
-            cwdResult = execSync(`lsof -c node -a -d cwd 2>/dev/null | grep "${projectPath}"`, {
+            cwdResult = execSync('lsof -c node -a -d cwd 2>/dev/null', {
                 encoding: 'utf-8',
                 timeout: 5000,
             });
         } catch {
-            // No matching processes
             return { running: false };
         }
 
-        if (!cwdResult.trim()) {
-            return { running: false };
-        }
+        if (!cwdResult.trim()) return { running: false };
 
-        // Parse PIDs from the result
         const lines = cwdResult.trim().split('\n');
         const pids = new Set<number>();
         for (const line of lines) {
-            const parts = line.split(/\s+/);
+            const parts = line.trim().split(/\s+/);
             if (parts.length >= 2) {
                 const pid = parseInt(parts[1], 10);
-                if (!isNaN(pid)) {
+                if (isNaN(pid)) continue;
+                const cwdMatch = line.match(/\s(\/.*)$/);
+                const cwdPath = cwdMatch ? cwdMatch[1] : parts[parts.length - 1];
+                if (cwdPath === targetPath) {
                     pids.add(pid);
                 }
             }
@@ -113,7 +134,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { action, projectId, projectName, parentPath } = body;
+        const { action, projectId, projectName, parentPath, path: relativePath } = body;
 
         if (action === 'create') {
             // Create new Next.js project
@@ -206,9 +227,12 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
             }
 
+            const normalizedPath = normalizeRelativePath(relativePath);
+            const serverKey = getServerKey(projectId, normalizedPath);
+
             // Check if already running
-            if (runningDevServers.has(projectId)) {
-                const server = runningDevServers.get(projectId)!;
+            if (runningDevServers.has(serverKey)) {
+                const server = runningDevServers.get(serverKey)!;
                 return NextResponse.json({
                     success: true,
                     running: true,
@@ -223,11 +247,35 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Project not found' }, { status: 404 });
             }
 
+            let workingDir: string;
+            try {
+                workingDir = resolveProjectPath(project.path, normalizedPath);
+            } catch {
+                return NextResponse.json({ error: 'Invalid project path' }, { status: 400 });
+            }
+
+            if (!fs.existsSync(workingDir) || !fs.statSync(workingDir).isDirectory()) {
+                return NextResponse.json({ error: 'Target path is not a directory' }, { status: 400 });
+            }
+
+            const packageJsonPath = path.join(workingDir, 'package.json');
+            if (!fs.existsSync(packageJsonPath)) {
+                return NextResponse.json({ error: 'package.json not found in target path' }, { status: 400 });
+            }
+            try {
+                const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+                if (!packageJson?.scripts?.dev) {
+                    return NextResponse.json({ error: 'No dev script found in package.json' }, { status: 400 });
+                }
+            } catch {
+                return NextResponse.json({ error: 'Failed to read package.json' }, { status: 400 });
+            }
+
             const port = await findAvailablePort(3001);
 
             // Start npm run dev
             const devProcess = spawn('npm', ['run', 'dev', '--', '--port', String(port)], {
-                cwd: project.path,
+                cwd: workingDir,
                 shell: true,
                 stdio: ['ignore', 'pipe', 'pipe'],
                 detached: false,
@@ -237,9 +285,11 @@ export async function POST(request: NextRequest) {
                 process: devProcess,
                 port,
                 output: '',
+                projectId,
+                relativePath: normalizedPath,
             };
 
-            runningDevServers.set(projectId, serverInfo);
+            runningDevServers.set(serverKey, serverInfo);
 
             devProcess.stdout?.on('data', (data) => {
                 serverInfo.output += data.toString();
@@ -250,11 +300,11 @@ export async function POST(request: NextRequest) {
             });
 
             devProcess.on('close', () => {
-                runningDevServers.delete(projectId);
+                runningDevServers.delete(serverKey);
             });
 
             devProcess.on('error', () => {
-                runningDevServers.delete(projectId);
+                runningDevServers.delete(serverKey);
             });
 
             return NextResponse.json({
@@ -270,7 +320,9 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
             }
 
-            const server = runningDevServers.get(projectId);
+            const normalizedPath = normalizeRelativePath(relativePath);
+            const serverKey = getServerKey(projectId, normalizedPath);
+            const server = runningDevServers.get(serverKey);
             if (server) {
                 try {
                     // Kill the process and its children
@@ -278,14 +330,20 @@ export async function POST(request: NextRequest) {
                 } catch {
                     server.process.kill('SIGTERM');
                 }
-                runningDevServers.delete(projectId);
+                runningDevServers.delete(serverKey);
                 return NextResponse.json({ success: true, running: false });
             }
 
             // Check for externally running server and kill it
             const project = projectService.getById(projectId);
             if (project) {
-                const externalServer = detectExternalDevServer(project.path);
+                let targetPath: string;
+                try {
+                    targetPath = resolveProjectPath(project.path, normalizedPath);
+                } catch {
+                    return NextResponse.json({ error: 'Invalid project path' }, { status: 400 });
+                }
+                const externalServer = detectExternalDevServer(targetPath);
                 if (externalServer.running && externalServer.pid) {
                     try {
                         // Kill the external process
@@ -306,7 +364,9 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
             }
 
-            const server = runningDevServers.get(projectId);
+            const normalizedPath = normalizeRelativePath(relativePath);
+            const serverKey = getServerKey(projectId, normalizedPath);
+            const server = runningDevServers.get(serverKey);
             if (server) {
                 return NextResponse.json({
                     running: true,
@@ -330,13 +390,15 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const relativePath = searchParams.get('path');
 
     if (!projectId) {
         // Return all running servers
-        const servers: { projectId: string; port: number; url: string }[] = [];
+        const servers: { projectId: string; path: string; port: number; url: string }[] = [];
         runningDevServers.forEach((info, id) => {
             servers.push({
-                projectId: id,
+                projectId: info.projectId,
+                path: info.relativePath === ROOT_RELATIVE_PATH ? '' : info.relativePath,
                 port: info.port,
                 url: `http://localhost:${info.port}`,
             });
@@ -344,7 +406,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ servers });
     }
 
-    const server = runningDevServers.get(projectId);
+    const normalizedPath = normalizeRelativePath(relativePath);
+    const serverKey = getServerKey(projectId, normalizedPath);
+    const server = runningDevServers.get(serverKey);
     if (server) {
         return NextResponse.json({
             running: true,
@@ -357,7 +421,13 @@ export async function GET(request: NextRequest) {
     // Check for externally running dev server
     const project = projectService.getById(projectId);
     if (project) {
-        const externalServer = detectExternalDevServer(project.path);
+        let targetPath: string;
+        try {
+            targetPath = resolveProjectPath(project.path, normalizedPath);
+        } catch {
+            return NextResponse.json({ running: false });
+        }
+        const externalServer = detectExternalDevServer(targetPath);
         if (externalServer.running && externalServer.port) {
             return NextResponse.json({
                 running: true,
