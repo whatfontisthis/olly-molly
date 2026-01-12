@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
@@ -108,6 +108,20 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
 
     const profileImage = member ? (uploadedImage || getProfileImage(member)) : undefined;
 
+    // Update prompt when member changes or modal opens
+    useEffect(() => {
+        if (member && isOpen) {
+            setPrompt(member.system_prompt);
+        }
+    }, [member, isOpen]);
+
+    // Reset uploaded image when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setUploadedImage(null);
+        }
+    }, [isOpen]);
+
     const handleSave = () => {
         if (member) {
             onSave(member.id, prompt);
@@ -172,16 +186,6 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
             }
         }
     };
-
-    // Update prompt when member changes
-    if (member && member.system_prompt !== prompt && !isOpen) {
-        setPrompt(member.system_prompt);
-    }
-
-    // Reset uploaded image when modal opens with different member
-    if (!isOpen && uploadedImage) {
-        setUploadedImage(null);
-    }
 
     return (
         <>
