@@ -95,7 +95,7 @@ function resolveRelativePath(basePath: string, relativePath: string): string {
 
 function MarkdownViewer({ content, projectId, filePath }: { content: string; projectId: string; filePath: string }) {
     return (
-        <div className="markdown-viewer">
+        <div className="markdown-viewer max-w-4xl mx-auto">
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -136,6 +136,7 @@ export function ProjectArtifactsModal({
     projectPath,
 }: ProjectArtifactsModalProps) {
     const [activeTab, setActiveTab] = useState<'files' | 'sites'>('files');
+    const [previewOnly, setPreviewOnly] = useState(false);
     const [currentPath, setCurrentPath] = useState('');
     const [entries, setEntries] = useState<FileEntry[]>([]);
     const [selectedFile, setSelectedFile] = useState<FileResponse | null>(null);
@@ -202,6 +203,7 @@ export function ProjectArtifactsModal({
     useEffect(() => {
         if (!isOpen) return;
         setActiveTab('files');
+        setPreviewOnly(false);
         setCurrentPath('');
         setEntries([]);
         setSelectedFile(null);
@@ -268,43 +270,52 @@ export function ProjectArtifactsModal({
         ? entries.filter(entry => ['AGENT_WORK_LOG.md', '.agent-screenshots'].includes(entry.name))
         : [];
 
+    const modalTitle = previewOnly ? undefined : '📎 프로젝트 아티팩트';
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="📎 프로젝트 아티팩트" size="4xl">
-            <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-[var(--text-muted)]">
-                        {projectName && <span className="text-[var(--text-secondary)]">{projectName}</span>}
-                        {projectPath && <span className="ml-2">{projectPath}</span>}
-                    </div>
-                    <div className="flex gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg">
-                        <button
-                            onClick={() => setActiveTab('files')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'files'
-                                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                                }`}
-                        >
-                            파일
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('sites')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'sites'
-                                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                                }`}
-                        >
-                            사이트
-                        </button>
-                    </div>
-                </div>
+        <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="full">
+            <div className="h-full flex flex-col">
+                {!previewOnly && (
+                    <div className="px-6 py-4 border-b border-[var(--border-primary)] space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs text-[var(--text-muted)]">
+                                {projectName && <span className="text-[var(--text-secondary)]">{projectName}</span>}
+                                {projectPath && <span className="ml-2">{projectPath}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {activeTab === 'files' && selectedFile && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setPreviewOnly(true)}
+                                    >
+                                        프리뷰만
+                                    </Button>
+                                )}
+                                <div className="flex gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg">
+                                    <button
+                                        onClick={() => setActiveTab('files')}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'files'
+                                            ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                            }`}
+                                    >
+                                        파일
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('sites')}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'sites'
+                                            ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                            }`}
+                                    >
+                                        사이트
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                {activeTab === 'files' && (
-                    <div className="space-y-3">
-                        {!projectId && (
-                            <div className="text-sm text-[var(--text-muted)]">프로젝트를 먼저 선택해주세요.</div>
-                        )}
-
-                        {projectId && (
+                        {activeTab === 'files' && projectId && (
                             <>
                                 <div className="flex items-center justify-between">
                                     <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -349,168 +360,245 @@ export function ProjectArtifactsModal({
                                         </button>
                                     </div>
                                 )}
+                            </>
+                        )}
+                    </div>
+                )}
 
-                                <div className="h-[65vh] border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                                    <ResizablePane
-                                        defaultLeftWidth={35}
-                                        minLeftWidth={25}
-                                        minRightWidth={40}
-                                        left={
-                                            <div className="h-full overflow-auto">
-                                                {directoryLoading ? (
-                                                    <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
-                                                ) : (
-                                                    <div className="divide-y divide-[var(--border-primary)]">
-                                                        {entries.length === 0 && (
-                                                            <div className="p-4 text-xs text-[var(--text-muted)]">파일이 없습니다.</div>
+                <div className="flex-1 overflow-hidden">
+                    {activeTab === 'files' && (
+                        <div className="h-full">
+                            {!projectId && !previewOnly && (
+                                <div className="p-6 text-sm text-[var(--text-muted)]">프로젝트를 먼저 선택해주세요.</div>
+                            )}
+                            {projectId && (
+                                <>
+                                    {!previewOnly && (
+                                        <div className="h-full border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                                            <ResizablePane
+                                                defaultLeftWidth={35}
+                                                minLeftWidth={25}
+                                                minRightWidth={40}
+                                                left={
+                                                    <div className="h-full overflow-auto">
+                                                        {directoryLoading ? (
+                                                            <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
+                                                        ) : (
+                                                            <div className="divide-y divide-[var(--border-primary)]">
+                                                                {entries.length === 0 && (
+                                                                    <div className="p-4 text-xs text-[var(--text-muted)]">파일이 없습니다.</div>
+                                                                )}
+                                                                {entries.map(entry => (
+                                                                    <button
+                                                                        key={entry.path}
+                                                                        onClick={() => handleEntryClick(entry)}
+                                                                        className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between gap-2 transition-colors ${selectedFile?.entry.path === entry.path
+                                                                            ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                                                                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                                                                            }`}
+                                                                    >
+                                                                        <span className="flex items-center gap-2 truncate">
+                                                                            <span>{entry.type === 'directory' ? '📁' : '📄'}</span>
+                                                                            <span className="truncate">{entry.name}</span>
+                                                                        </span>
+                                                                        <span className="text-[10px] text-[var(--text-muted)]">
+                                                                            {entry.type === 'directory' ? 'folder' : formatBytes(entry.size)}
+                                                                        </span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
                                                         )}
-                                                        {entries.map(entry => (
-                                                            <button
-                                                                key={entry.path}
-                                                                onClick={() => handleEntryClick(entry)}
-                                                                className={`w-full px-4 py-2 text-left text-sm flex items-center justify-between gap-2 transition-colors ${selectedFile?.entry.path === entry.path
-                                                                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
-                                                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                                                                    }`}
-                                                            >
-                                                                <span className="flex items-center gap-2 truncate">
-                                                                    <span>{entry.type === 'directory' ? '📁' : '📄'}</span>
-                                                                    <span className="truncate">{entry.name}</span>
-                                                                </span>
-                                                                <span className="text-[10px] text-[var(--text-muted)]">
-                                                                    {entry.type === 'directory' ? 'folder' : formatBytes(entry.size)}
-                                                                </span>
-                                                            </button>
-                                                        ))}
                                                     </div>
-                                                )}
+                                                }
+                                                right={
+                                                    <div className="h-full flex flex-col">
+                                                        {error && (
+                                                            <div className="px-4 py-2 text-xs text-red-500 border-b border-[var(--border-primary)]">
+                                                                {error}
+                                                            </div>
+                                                        )}
+                                                        {!selectedFile && !error && (
+                                                            <div className="flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">
+                                                                파일을 선택하세요.
+                                                            </div>
+                                                        )}
+                                                        {selectedFile && (
+                                                            <>
+                                                                <div className="px-4 py-2 border-b border-[var(--border-primary)] text-xs text-[var(--text-muted)] flex items-center justify-between">
+                                                                    <span className="truncate">{fileMeta?.path || fileMeta?.name}</span>
+                                                                    <span className="ml-2">
+                                                                        {fileMeta ? formatBytes(fileMeta.size) : ''}
+                                                                        {selectedFile.truncated && ' · 일부만 표시됨'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex-1 overflow-auto bg-[var(--bg-card)]">
+                                                                    {fileLoading && (
+                                                                        <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
+                                                                    )}
+                                                                    {!fileLoading && selectedFile.isBinary && !isImage && (
+                                                                        <div className="p-4 text-xs text-[var(--text-muted)]">
+                                                                            이 파일은 미리보기를 지원하지 않습니다.
+                                                                        </div>
+                                                                    )}
+                                                                    {!fileLoading && isImage && (
+                                                                        <div className="p-6 flex items-start justify-center">
+                                                                            <img
+                                                                                src={filePreviewUrl}
+                                                                                alt={fileMeta?.name || 'preview'}
+                                                                                className="max-w-full rounded-lg border border-[var(--border-primary)]"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {!fileLoading && !selectedFile.isBinary && isMarkdown && (
+                                                                        <div className="p-6">
+                                                                            <MarkdownViewer
+                                                                                content={fileContent}
+                                                                                projectId={projectId || ''}
+                                                                                filePath={selectedFile.entry.path}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {!fileLoading && !selectedFile.isBinary && !isMarkdown && (
+                                                                        <div className="p-6">
+                                                                            <pre className={`code-viewer ${isCode ? 'code-viewer--source' : ''}`}>
+                                                                                <code>{fileContent}</code>
+                                                                            </pre>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                }
+                                            />
+                                        </div>
+                                    )}
+
+                                    {previewOnly && (
+                                        <div className="h-full bg-[var(--bg-card)] relative">
+                                            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => setPreviewOnly(false)}
+                                                >
+                                                    목록 보기
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={onClose}
+                                                >
+                                                    닫기
+                                                </Button>
                                             </div>
-                                        }
-                                        right={
-                                            <div className="h-full flex flex-col">
-                                                {error && (
-                                                    <div className="px-4 py-2 text-xs text-red-500 border-b border-[var(--border-primary)]">
-                                                        {error}
-                                                    </div>
-                                                )}
-                                                {!selectedFile && !error && (
-                                                    <div className="flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">
+                                            <div className="h-full overflow-auto">
+                                                {!selectedFile && (
+                                                    <div className="h-full flex items-center justify-center text-sm text-[var(--text-muted)]">
                                                         파일을 선택하세요.
                                                     </div>
                                                 )}
                                                 {selectedFile && (
-                                                    <>
-                                                        <div className="px-4 py-2 border-b border-[var(--border-primary)] text-xs text-[var(--text-muted)] flex items-center justify-between">
-                                                            <span className="truncate">{fileMeta?.path || fileMeta?.name}</span>
-                                                            <span className="ml-2">
-                                                                {fileMeta ? formatBytes(fileMeta.size) : ''}
-                                                                {selectedFile.truncated && ' · 일부만 표시됨'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex-1 overflow-auto bg-[var(--bg-card)]">
-                                                            {fileLoading && (
-                                                                <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
-                                                            )}
-                                                            {!fileLoading && selectedFile.isBinary && !isImage && (
-                                                                <div className="p-4 text-xs text-[var(--text-muted)]">
-                                                                    이 파일은 미리보기를 지원하지 않습니다.
-                                                                </div>
-                                                            )}
-                                                            {!fileLoading && isImage && (
-                                                                <div className="p-6 flex items-start justify-center">
-                                                                    <img
-                                                                        src={filePreviewUrl}
-                                                                        alt={fileMeta?.name || 'preview'}
-                                                                        className="max-w-full rounded-lg border border-[var(--border-primary)]"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {!fileLoading && !selectedFile.isBinary && isMarkdown && (
-                                                                <div className="p-6">
-                                                                    <MarkdownViewer
-                                                                        content={fileContent}
-                                                                        projectId={projectId || ''}
-                                                                        filePath={selectedFile.entry.path}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {!fileLoading && !selectedFile.isBinary && !isMarkdown && (
-                                                                <div className="p-6">
-                                                                    <pre className={`code-viewer ${isCode ? 'code-viewer--source' : ''}`}>
-                                                                        <code>{fileContent}</code>
-                                                                    </pre>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </>
+                                                    <div className="h-full">
+                                                        {!fileLoading && selectedFile.isBinary && !isImage && (
+                                                            <div className="p-6 text-xs text-[var(--text-muted)]">
+                                                                이 파일은 미리보기를 지원하지 않습니다.
+                                                            </div>
+                                                        )}
+                                                        {!fileLoading && isImage && (
+                                                            <div className="p-6 flex items-start justify-center">
+                                                                <img
+                                                                    src={filePreviewUrl}
+                                                                    alt={fileMeta?.name || 'preview'}
+                                                                    className="max-w-full rounded-lg border border-[var(--border-primary)]"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        {!fileLoading && !selectedFile.isBinary && isMarkdown && (
+                                                            <div className="p-6">
+                                                                <MarkdownViewer
+                                                                    content={fileContent}
+                                                                    projectId={projectId || ''}
+                                                                    filePath={selectedFile.entry.path}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        {!fileLoading && !selectedFile.isBinary && !isMarkdown && (
+                                                            <div className="p-6">
+                                                                <pre className={`code-viewer ${isCode ? 'code-viewer--source' : ''}`}>
+                                                                    <code>{fileContent}</code>
+                                                                </pre>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
-                                        }
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
 
-                {activeTab === 'sites' && (
-                    <div className="space-y-3">
-                        {!projectId && (
-                            <div className="text-sm text-[var(--text-muted)]">프로젝트를 먼저 선택해주세요.</div>
-                        )}
-                        {projectId && (
-                            <>
-                                <div className="flex items-center justify-between">
-                                    <div className="text-xs text-[var(--text-muted)]">
-                                        dev 스크립트가 있는 package.json을 찾아서 보여줍니다.
+                    {activeTab === 'sites' && (
+                        <div className="p-6">
+                            {!projectId && (
+                                <div className="text-sm text-[var(--text-muted)]">프로젝트를 먼저 선택해주세요.</div>
+                            )}
+                            {projectId && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs text-[var(--text-muted)]">
+                                            dev 스크립트가 있는 package.json을 찾아서 보여줍니다.
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={loadSites}
+                                            disabled={sitesLoading}
+                                        >
+                                            새로고침
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={loadSites}
-                                        disabled={sitesLoading}
-                                    >
-                                        새로고침
-                                    </Button>
-                                </div>
-                                <div className="border border-[var(--border-primary)] bg-[var(--bg-secondary)] rounded-lg">
-                                    {sitesLoading && (
-                                        <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
-                                    )}
-                                    {sitesError && (
-                                        <div className="p-4 text-xs text-red-500">{sitesError}</div>
-                                    )}
-                                    {!sitesLoading && !sitesError && sites.length === 0 && (
-                                        <div className="p-4 text-xs text-[var(--text-muted)]">
-                                            dev 스크립트가 있는 사이트를 찾지 못했어요.
-                                        </div>
-                                    )}
-                                    {!sitesLoading && !sitesError && sites.length > 0 && (
-                                        <div className="divide-y divide-[var(--border-primary)]">
-                                            {sites.map(site => {
-                                                const label = site.name || (site.path ? site.path.split('/').pop() : 'root');
-                                                const displayPath = site.path || '.';
-                                                return (
-                                                    <div key={site.id} className="flex items-center justify-between px-4 py-3">
-                                                        <div className="min-w-0">
-                                                            <div className="text-sm text-[var(--text-primary)] truncate">{label}</div>
-                                                            <div className="text-xs text-[var(--text-muted)] truncate">{displayPath}</div>
+                                    <div className="border border-[var(--border-primary)] bg-[var(--bg-secondary)] rounded-lg">
+                                        {sitesLoading && (
+                                            <div className="p-4 text-xs text-[var(--text-muted)]">불러오는 중...</div>
+                                        )}
+                                        {sitesError && (
+                                            <div className="p-4 text-xs text-red-500">{sitesError}</div>
+                                        )}
+                                        {!sitesLoading && !sitesError && sites.length === 0 && (
+                                            <div className="p-4 text-xs text-[var(--text-muted)]">
+                                                dev 스크립트가 있는 사이트를 찾지 못했어요.
+                                            </div>
+                                        )}
+                                        {!sitesLoading && !sitesError && sites.length > 0 && (
+                                            <div className="divide-y divide-[var(--border-primary)]">
+                                                {sites.map(site => {
+                                                    const label = site.name || (site.path ? site.path.split('/').pop() : 'root');
+                                                    const displayPath = site.path || '.';
+                                                    return (
+                                                        <div key={site.id} className="flex items-center justify-between px-4 py-3">
+                                                            <div className="min-w-0">
+                                                                <div className="text-sm text-[var(--text-primary)] truncate">{label}</div>
+                                                                <div className="text-xs text-[var(--text-muted)] truncate">{displayPath}</div>
+                                                            </div>
+                                                            <DevServerControl
+                                                                projectId={projectId}
+                                                                projectName={projectName || null}
+                                                                relativePath={site.path}
+                                                            />
                                                         </div>
-                                                        <DevServerControl
-                                                            projectId={projectId}
-                                                            projectName={projectName || null}
-                                                            relativePath={site.path}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </>
-                        )}
-                    </div>
-                )}
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </Modal>
     );

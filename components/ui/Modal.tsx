@@ -7,7 +7,7 @@ interface ModalProps {
     onClose: () => void;
     title?: string;
     children: ReactNode;
-    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | 'full';
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
@@ -38,12 +38,13 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         xl: 'max-w-xl',
         '2xl': 'max-w-2xl',
         '4xl': 'max-w-4xl',
+        full: 'max-w-none w-full h-full rounded-none',
     };
 
     return (
         <div
             ref={overlayRef}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in"
+            className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in ${size === 'full' ? 'p-0' : 'p-4'}`}
             onClick={(e) => e.target === overlayRef.current && onClose()}
         >
             {/* Minimal backdrop */}
@@ -55,7 +56,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
                 bg-[var(--bg-card)] 
                 border border-[var(--border-primary)]
                 animate-in zoom-in-95
-                max-h-[calc(100vh-4rem)] overflow-y-auto
+                ${size === 'full' ? 'max-h-none' : 'max-h-[calc(100vh-4rem)]'} overflow-y-auto
             `}>
                 {title && (
                     <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
@@ -70,7 +71,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
                         </button>
                     </div>
                 )}
-                <div className="p-6">{children}</div>
+                <div className={size === 'full' ? 'p-0' : 'p-6'}>{children}</div>
             </div>
         </div>
     );
