@@ -78,13 +78,13 @@ export function ConversationView({ conversation, messages, isRunning = false, jo
     const getMessageTypeClass = (type: ConversationMessage['message_type']) => {
         switch (type) {
             case 'error':
-                return 'text-red-400 bg-red-500/10 border-red-500/20';
+                return 'text-muted border-transparent hover:bg-black/5';
             case 'success':
                 return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
             case 'system':
                 return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
             default:
-                return 'text-[var(--text-tertiary)] bg-black/20 border-transparent';
+                return 'text-primary bg-secondary/50 border-primary/10';
         }
     };
 
