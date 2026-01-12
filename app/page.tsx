@@ -25,6 +25,7 @@ interface Member {
   name: string;
   avatar?: string | null;
   system_prompt: string;
+  is_default: number;
 }
 
 interface Ticket {
@@ -168,6 +169,38 @@ export default function Dashboard() {
       setMembers(prev => prev.map(m => m.id === id ? updatedMember : m));
     } catch (error) {
       console.error('Failed to update member:', error);
+    }
+  }, []);
+
+  const handleMemberCreate = useCallback(async (data: { role: string; name: string; avatar: string; system_prompt: string }) => {
+    try {
+      const res = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const newMember = await res.json();
+      setMembers(prev => [...prev, newMember]);
+    } catch (error) {
+      console.error('Failed to create member:', error);
+      alert('Failed to create member. Please try again.');
+    }
+  }, []);
+
+  const handleMemberDelete = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.error || 'Failed to delete member');
+        return;
+      }
+      setMembers(prev => prev.filter(m => m.id !== id));
+    } catch (error) {
+      console.error('Failed to delete member:', error);
+      alert('Failed to delete member. Please try again.');
     }
   }, []);
 
@@ -318,7 +351,12 @@ export default function Dashboard() {
           p-4 transition-transform duration-200 overflow-hidden z-20
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}
         `}>
-          <TeamPanel members={members} onUpdateMember={handleMemberUpdate} />
+          <TeamPanel
+            members={members}
+            onUpdateMember={handleMemberUpdate}
+            onCreateMember={handleMemberCreate}
+            onDeleteMember={handleMemberDelete}
+          />
         </aside>
       </div>
 

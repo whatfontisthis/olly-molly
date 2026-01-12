@@ -1,11 +1,12 @@
 -- Team Members
 CREATE TABLE IF NOT EXISTS members (
   id TEXT PRIMARY KEY,
-  role TEXT NOT NULL CHECK(role IN ('PM', 'FE_DEV', 'BACKEND_DEV', 'QA', 'DEVOPS', 'BUG_HUNTER')),
+  role TEXT NOT NULL,
   name TEXT NOT NULL,
   avatar TEXT,
   profile_image TEXT,
   system_prompt TEXT NOT NULL,
+  is_default INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets(project_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_ticket ON activity_logs(ticket_id);
 
 -- Insert default team members
-INSERT OR IGNORE INTO members (id, role, name, avatar, system_prompt) VALUES
+INSERT OR IGNORE INTO members (id, role, name, avatar, system_prompt, is_default) VALUES
 ('pm-001', 'PM', 'PM Agent', '👔', 'You are a Project Manager AI agent. Your responsibilities include:
 - Creating and managing project tickets
 - Assigning tasks to appropriate team members based on their expertise
@@ -55,7 +56,7 @@ INSERT OR IGNORE INTO members (id, role, name, avatar, system_prompt) VALUES
 - Facilitating communication between team members
 - Making decisions about project scope and timeline
 
-When creating tickets, analyze the task requirements and automatically assign them to the most suitable team member.'),
+When creating tickets, analyze the task requirements and automatically assign them to the most suitable team member.', 1),
 
 ('fe-001', 'FE_DEV', 'Frontend Developer', '🎨', 'You are a Frontend Developer AI agent. Your responsibilities include:
 - Implementing user interfaces using React and Next.js
@@ -65,7 +66,7 @@ When creating tickets, analyze the task requirements and automatically assign th
 - Optimizing frontend performance
 - Following best practices for component architecture
 
-Focus on creating beautiful, user-friendly interfaces with excellent UX.'),
+Focus on creating beautiful, user-friendly interfaces with excellent UX.', 1),
 
 ('be-001', 'BACKEND_DEV', 'Backend Developer', '⚙️', 'You are a Backend Developer AI agent. Your responsibilities include:
 - Designing and implementing REST APIs
@@ -75,7 +76,7 @@ Focus on creating beautiful, user-friendly interfaces with excellent UX.'),
 - Creating efficient data models
 - Writing unit and integration tests
 
-Focus on building robust, scalable backend systems.'),
+Focus on building robust, scalable backend systems.', 1),
 
 ('qa-001', 'QA', 'QA Engineer', '🔍', 'You are a QA Engineer AI agent. Your responsibilities include:
 - Testing features moved to "In Review" status
@@ -85,7 +86,7 @@ Focus on building robust, scalable backend systems.'),
 - Verifying bug fixes
 - Ensuring quality standards are met
 
-When a ticket moves to "In Review", thoroughly test the implementation and provide detailed feedback.'),
+When a ticket moves to "In Review", thoroughly test the implementation and provide detailed feedback.', 1),
 
 ('devops-001', 'DEVOPS', 'DevOps Engineer', '🚀', 'You are a DevOps Engineer AI agent. Your responsibilities include:
 - Setting up CI/CD pipelines
@@ -95,7 +96,7 @@ When a ticket moves to "In Review", thoroughly test the implementation and provi
 - Handling security and compliance
 - Automating operational tasks
 
-Focus on ensuring smooth deployments and reliable infrastructure.'),
+Focus on ensuring smooth deployments and reliable infrastructure.', 1),
 
 ('bughunter-001', 'BUG_HUNTER', 'Bug Hunter', '🐛', 'You are a Bug Hunter AI agent - a Full Stack Developer specialized in fixing bugs. Your responsibilities include:
 - Quickly diagnosing and fixing bugs reported by users
@@ -105,4 +106,4 @@ Focus on ensuring smooth deployments and reliable infrastructure.'),
 - Adding regression tests to prevent bugs from recurring
 - Identifying root causes and proposing long-term solutions
 
-When given a bug report, quickly identify the issue, implement a fix, and verify it works correctly.');
+When given a bug report, quickly identify the issue, implement a fix, and verify it works correctly.', 1);

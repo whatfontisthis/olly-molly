@@ -15,6 +15,7 @@ interface Member {
     avatar?: string | null;
     profile_image?: string | null;
     system_prompt: string;
+    is_default: number;
 }
 
 interface MemberCardProps {
@@ -94,10 +95,11 @@ interface SystemPromptEditorProps {
     member: Member | null;
     onSave: (id: string, systemPrompt: string) => void;
     onProfileImageChange?: (id: string, imagePath: string) => void;
+    onDelete?: (id: string) => void;
 }
 
 
-export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileImageChange }: SystemPromptEditorProps) {
+export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileImageChange, onDelete }: SystemPromptEditorProps) {
     const [prompt, setPrompt] = useState(member?.system_prompt || '');
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -278,6 +280,19 @@ export function SystemPromptEditor({ isOpen, onClose, member, onSave, onProfileI
 
                     <div className="flex justify-end gap-3 pt-2">
                         <Button variant="ghost" onClick={onClose}>Cancel</Button>
+                        {member && member.is_default === 0 && onDelete && (
+                            <Button
+                                variant="danger"
+                                onClick={() => {
+                                    if (confirm(`Are you sure you want to delete ${member.name}? This action cannot be undone.`)) {
+                                        onDelete(member.id);
+                                        onClose();
+                                    }
+                                }}
+                            >
+                                Delete Member
+                            </Button>
+                        )}
                         <Button variant="primary" onClick={handleSave}>Save Changes</Button>
                     </div>
                 </div>

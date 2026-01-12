@@ -10,3 +10,24 @@ export async function GET() {
         return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
     }
 }
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const { role, name, avatar, system_prompt } = body;
+
+        // Validation
+        if (!role || !name || !system_prompt) {
+            return NextResponse.json(
+                { error: 'Missing required fields: role, name, system_prompt' },
+                { status: 400 }
+            );
+        }
+
+        const newMember = memberService.create({ role, name, avatar, system_prompt });
+        return NextResponse.json(newMember, { status: 201 });
+    } catch (error) {
+        console.error('Error creating member:', error);
+        return NextResponse.json({ error: 'Failed to create member' }, { status: 500 });
+    }
+}

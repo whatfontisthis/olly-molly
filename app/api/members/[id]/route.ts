@@ -35,3 +35,25 @@ export async function PATCH(
         return NextResponse.json({ error: 'Failed to update member' }, { status: 500 });
     }
 }
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const result = memberService.delete(id);
+
+        if (!result.success) {
+            return NextResponse.json(
+                { error: result.error },
+                { status: result.error === 'Member not found' ? 404 : 403 }
+            );
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting member:', error);
+        return NextResponse.json({ error: 'Failed to delete member' }, { status: 500 });
+    }
+}

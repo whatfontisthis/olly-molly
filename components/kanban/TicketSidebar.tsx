@@ -16,6 +16,7 @@ interface Member {
     avatar?: string | null;
     role: string;
     system_prompt: string;
+    is_default: number;
 }
 
 interface Ticket {

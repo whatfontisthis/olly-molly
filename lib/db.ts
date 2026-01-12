@@ -79,6 +79,20 @@ function runMigrations(db: DatabaseType) {
     db.exec('ALTER TABLE members ADD COLUMN profile_image TEXT');
   }
 
+  // Check if is_default column exists in members table
+  const hasIsDefault = tableInfo.some(col => col.name === 'is_default');
+
+  if (!hasIsDefault) {
+    console.log('Running migration: Adding is_default column to members table');
+    db.exec('ALTER TABLE members ADD COLUMN is_default INTEGER DEFAULT 0');
+
+    // Mark existing default members as is_default = 1
+    const defaultMemberIds = ['pm-001', 'fe-001', 'be-001', 'qa-001', 'devops-001', 'bughunter-001'];
+    const placeholders = defaultMemberIds.map(() => '?').join(',');
+    db.prepare(`UPDATE members SET is_default = 1 WHERE id IN (${placeholders})`).run(...defaultMemberIds);
+    console.log('Migration: Marked default members with is_default = 1');
+  }
+
   // Check if CHECK constraint needs updating for BUG_HUNTER role
   // We detect this by checking if BUG_HUNTER already exists
   const bugHunter = db.prepare("SELECT id FROM members WHERE id = 'bughunter-001'").get();
@@ -145,11 +159,12 @@ When given a bug report, quickly identify the issue, implement a fix, and verify
 // Types
 export interface Member {
   id: string;
-  role: 'PM' | 'FE_DEV' | 'BACKEND_DEV' | 'QA' | 'DEVOPS' | 'BUG_HUNTER';
+  role: string;
   name: string;
   avatar: string | null;
   profile_image: string | null;
   system_prompt: string;
+  is_default: number;
   created_at: string;
   updated_at: string;
 }
@@ -279,6 +294,29 @@ export const memberService = {
     }
 
     return this.getById(id);
+  },
+
+  create(data: { role: string; name: string; avatar?: string; system_prompt: string }): Member {
+    const id = uuidv4();
+    getDb().prepare(`
+      INSERT INTO members (id, role, name, avatar, system_prompt, is_default)
+      VALUES (?, ?, ?, ?, ?, 0)
+    `).run(id, data.role, data.name, data.avatar || null, data.system_prompt);
+    return this.getById(id)!;
+  },
+
+  delete(id: string): { success: boolean; error?: string } {
+    const member = this.getById(id);
+    if (!member) {
+      return { success: false, error: 'Member not found' };
+    }
+
+    if (member.is_default === 1) {
+      return { success: false, error: 'Cannot delete default team members' };
+    }
+
+    const result = getDb().prepare('DELETE FROM members WHERE id = ?').run(id);
+    return { success: result.changes > 0 };
   }
 };
 
