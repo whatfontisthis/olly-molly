@@ -108,7 +108,7 @@ export function TicketSidebar({
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
     // UI state
-    const [showTicketDetails, setShowTicketDetails] = useState(false);
+    const [showTicketDetails, setShowTicketDetails] = useState(true);
     const [showAgentControls, setShowAgentControls] = useState(false);
 
     // Conversations
@@ -125,6 +125,7 @@ export function TicketSidebar({
             setStatus(ticket.status);
             setPriority(ticket.priority);
             setAssigneeId(ticket.assignee_id || '');
+            setShowTicketDetails(true);
             // Reset executing state and conversation selection when switching tickets
             setExecuting(false);
             setSelectedConversationId(null);

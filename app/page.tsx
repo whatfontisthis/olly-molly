@@ -134,8 +134,10 @@ export default function Dashboard() {
       });
       const newTicket = await res.json();
       setTickets(prev => [newTicket, ...prev]);
+      return newTicket as Ticket;
     } catch (error) {
       console.error('Failed to create ticket:', error);
+      return null;
     }
   }, [activeProject]);
 
@@ -222,8 +224,16 @@ export default function Dashboard() {
 
 
 
-  const handleCreateTicket = () => {
-    handleTicketCreate({ title: 'New Ticket', status: 'TODO', priority: 'MEDIUM' });
+  const handleCreateTicket = async () => {
+    const newTicket = await handleTicketCreate({
+      title: 'New Ticket',
+      status: 'TODO',
+      priority: 'MEDIUM'
+    });
+    if (newTicket) {
+      setSelectedTicket(newTicket);
+      setTicketSidebarOpen(true);
+    }
   };
 
   const runningCount = runningJobs.filter(j => j.status === 'running').length;
