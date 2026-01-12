@@ -185,7 +185,7 @@ export function ImageSettingsModal({ isOpen, onClose }: ImageSettingsModalProps)
                             />
                             <div>
                                 <div className="text-sm font-medium text-[var(--text-primary)]">NanoBanana (Gemini)</div>
-                                <div className="text-xs text-[var(--text-muted)]">Google Gemini 이미지 생성 API</div>
+                                <div className="text-xs text-[var(--text-muted)]">Google Gemini 3 Pro Image Preview API</div>
                             </div>
                         </label>
                     </div>
