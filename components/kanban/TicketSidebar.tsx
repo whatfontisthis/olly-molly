@@ -54,6 +54,38 @@ const priorityOptions = [
     { value: 'CRITICAL', label: 'Critical' },
 ];
 
+// Web Notification helper
+function showNotification(title: string, body: string, icon?: string) {
+    // Check if browser supports notifications
+    if (!('Notification' in window)) {
+        console.log('This browser does not support notifications');
+        return;
+    }
+
+    const notificationIcon = icon || '/app-icon.png';
+
+    // Request permission if not granted
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: notificationIcon });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification(title, { body, icon: notificationIcon });
+            }
+        });
+    }
+}
+
+// Role to profile image mapping
+const roleProfileImages: Record<string, string> = {
+    PM: '/profiles/pm.png',
+    FE_DEV: '/profiles/fe.png',
+    BACKEND_DEV: '/profiles/be.png',
+    QA: '/profiles/qa.png',
+    DEVOPS: '/profiles/devops.png',
+    BUG_HUNTER: '/profiles/bughunter.png',
+};
+
 export function TicketSidebar({
     isOpen,
     onClose,
@@ -163,6 +195,17 @@ export function TicketSidebar({
                         if (ticketData.status && !isCancelled) {
                             setStatus(ticketData.status);
                             onTicketUpdate(ticket.id, { status: ticketData.status });
+
+                            // Show web notification when agent completes work
+                            if (ticketData.status === 'IN_REVIEW' && ticket.assignee) {
+                                const agentName = ticket.assignee.name;
+                                const agentIcon = roleProfileImages[ticket.assignee.role] || '/app-icon.png';
+                                showNotification(
+                                    `✅ ${agentName} 작업 완료!`,
+                                    `"${ticket.title}" 작업이 완료되어 리뷰 대기 중입니다.`,
+                                    agentIcon
+                                );
+                            }
                         }
                     }
                 }
