@@ -28,6 +28,19 @@ function buildAgentPrompt(ticket: {
 2. TOOL USAGE: You MUST use the **Playwright MCP** (https://github.com/microsoft/playwright-mcp) tools for automated testing. verify the available tools and use them for browser automation and testing. Do NOT rely solely on manual terminal commands.`
         : '';
 
+    // Check if role is FE_DEV to add screenshot instructions
+    const isFrontend = agent.role === 'FE_DEV';
+    const screenshotInstruction = isFrontend
+        ? `\n\nSCREENSHOT REQUIREMENT:
+After completing your UI changes, you MUST take screenshots to document your work:
+1. Start the dev server with PORT=3001 (e.g., "PORT=3001 npm run dev")
+2. Use browser automation tools (Playwright MCP or similar) to capture screenshots
+3. Save screenshots to the ".agent-screenshots/" folder in the project root
+4. Name files descriptively (e.g., "login-page-updated.png", "dashboard-new-layout.png")
+5. Include multiple screenshots if you changed multiple pages/components
+This is MANDATORY for all frontend changes so other agents can reference your visual changes.`
+        : '';
+
     const feedbackSection = feedback
         ? `\n\nIMPORTANT FEEDBACK FROM USER:\n${feedback}\n\nPlease address this feedback specifically in your implementation.`
         : '';
@@ -52,7 +65,7 @@ INSTRUCTIONS:
 4. Write clean, well-documented code
 5. After completing, provide a brief summary of changes made
 6. If you make changes, commit them with a meaningful message
-7. CRITICAL: You are working on the external project "${project.name}". When starting its server, ALWAYS use port 3001 (e.g. "PORT=3001 npm run dev"). NEVER use port 1234.${qaInstruction}
+7. CRITICAL: You are working on the external project "${project.name}". When starting its server, ALWAYS use port 3001 (e.g. "PORT=3001 npm run dev"). NEVER use port 1234.${qaInstruction}${screenshotInstruction}
 
 Please complete this task now.`;
 }

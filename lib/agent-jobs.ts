@@ -90,6 +90,9 @@ function appendToWorkLog(projectPath: string, entry: WorkLogEntry): void {
         // Extract summary from output (last few meaningful lines)
         const summaryLines = extractSummary(entry.output);
 
+        // Check for screenshots in .agent-screenshots folder
+        const screenshotSection = getScreenshotSection(projectPath);
+
         // Build the new entry
         const newEntry = `
 ## ${timestamp} - ${entry.agentName} ${entry.agentAvatar}
@@ -100,7 +103,7 @@ ${entry.commitHash ? `**커밋:** ${entry.commitHash}` : ''}
 
 ### 작업 요약
 ${summaryLines}
-
+${screenshotSection}
 ---
 `;
 
@@ -132,6 +135,55 @@ ${summaryLines}
         console.log(`[agent-jobs] Work log updated: ${logPath}`);
     } catch (error) {
         console.error(`[agent-jobs] Failed to update work log:`, error);
+    }
+}
+
+// Screenshot folder name
+const SCREENSHOT_FOLDER = '.agent-screenshots';
+
+/**
+ * Get screenshot section for the work log
+ * Looks for recent screenshots in .agent-screenshots folder
+ */
+function getScreenshotSection(projectPath: string): string {
+    try {
+        const screenshotDir = path.join(projectPath, SCREENSHOT_FOLDER);
+
+        if (!fs.existsSync(screenshotDir)) {
+            return '';
+        }
+
+        const files = fs.readdirSync(screenshotDir);
+        const imageFiles = files.filter(f =>
+            /\.(png|jpg|jpeg|gif|webp)$/i.test(f)
+        );
+
+        if (imageFiles.length === 0) {
+            return '';
+        }
+
+        // Get files modified in the last 10 minutes (likely from current work)
+        const recentFiles = imageFiles.filter(f => {
+            const filePath = path.join(screenshotDir, f);
+            const stats = fs.statSync(filePath);
+            const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+            return stats.mtimeMs > tenMinutesAgo;
+        });
+
+        const filesToInclude = recentFiles.length > 0 ? recentFiles : imageFiles.slice(-3);
+
+        if (filesToInclude.length === 0) {
+            return '';
+        }
+
+        const screenshotLinks = filesToInclude.map(f =>
+            `![${f}](${SCREENSHOT_FOLDER}/${f})`
+        ).join('\n');
+
+        return `\n### 스크린샷\n${screenshotLinks}\n`;
+    } catch (error) {
+        console.error(`[agent-jobs] Failed to get screenshots:`, error);
+        return '';
     }
 }
 
