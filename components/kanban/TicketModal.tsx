@@ -220,7 +220,9 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
 
     const memberOptions = [
         { value: '', label: 'Unassigned' },
-        ...members.map(m => ({ value: m.id, label: `${m.avatar} ${m.name}` }))
+        ...members
+            .filter(m => m.role !== 'PM') // PM은 담당자로 선택 불가
+            .map(m => ({ value: m.id, label: `${m.avatar} ${m.name}` }))
     ];
 
     const formatDuration = (ms: number) => {
