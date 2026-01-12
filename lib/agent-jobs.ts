@@ -1,4 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { conversationService, conversationMessageService, activityService, ticketService } from './db';
 
 export type AgentProvider = 'claude' | 'opencode';
@@ -61,6 +63,119 @@ export function getJobByTicketId(ticketId: string): Omit<RunningJob, 'process'> 
 export function getJobOutput(jobId: string): string | null {
     const job = runningJobs.get(jobId);
     return job?.output || null;
+}
+
+// Agent Work Log file name
+const WORK_LOG_FILE = 'AGENT_WORK_LOG.md';
+
+interface WorkLogEntry {
+    agentName: string;
+    agentAvatar: string;
+    ticketTitle: string;
+    success: boolean;
+    commitHash?: string;
+    output: string;
+}
+
+/**
+ * Append a work log entry to the project's AGENT_WORK_LOG.md file
+ * New entries are added at the top so the most recent work is first
+ */
+function appendToWorkLog(projectPath: string, entry: WorkLogEntry): void {
+    try {
+        const logPath = path.join(projectPath, WORK_LOG_FILE);
+        const now = new Date();
+        const timestamp = now.toISOString().replace('T', ' ').split('.')[0];
+
+        // Extract summary from output (last few meaningful lines)
+        const summaryLines = extractSummary(entry.output);
+
+        // Build the new entry
+        const newEntry = `
+## ${timestamp} - ${entry.agentName} ${entry.agentAvatar}
+
+**티켓:** ${entry.ticketTitle}
+**상태:** ${entry.success ? '✅ 성공' : '❌ 실패'}
+${entry.commitHash ? `**커밋:** ${entry.commitHash}` : ''}
+
+### 작업 요약
+${summaryLines}
+
+---
+`;
+
+        // Check if file exists
+        if (fs.existsSync(logPath)) {
+            // Read existing content
+            const existingContent = fs.readFileSync(logPath, 'utf-8');
+            // Find the position after the header (after first ---)
+            const headerEndPos = existingContent.indexOf('---');
+            if (headerEndPos !== -1) {
+                const header = existingContent.substring(0, headerEndPos + 3);
+                const rest = existingContent.substring(headerEndPos + 3);
+                fs.writeFileSync(logPath, header + newEntry + rest, 'utf-8');
+            } else {
+                // No separator found, append to end
+                fs.writeFileSync(logPath, existingContent + newEntry, 'utf-8');
+            }
+        } else {
+            // Create new file with header
+            const header = `# Agent Work Log
+
+이 파일은 AI 에이전트들의 작업 기록입니다. 새로운 에이전트는 작업 전 이 파일을 참고하세요.
+
+---
+`;
+            fs.writeFileSync(logPath, header + newEntry, 'utf-8');
+        }
+
+        console.log(`[agent-jobs] Work log updated: ${logPath}`);
+    } catch (error) {
+        console.error(`[agent-jobs] Failed to update work log:`, error);
+    }
+}
+
+/**
+ * Extract a meaningful summary from agent output
+ */
+function extractSummary(output: string): string {
+    // Remove ANSI escape codes
+    const cleanOutput = output.replace(/\x1B\[[0-9;]*[mK]/g, '');
+
+    // Look for common summary patterns
+    const lines = cleanOutput.split('\n').filter(line => line.trim());
+
+    // Try to find commit message or summary section
+    const summaryIndicators = ['summary', 'changes', 'completed', 'done', 'created', 'updated', 'fixed', 'added'];
+    const relevantLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].toLowerCase();
+        if (summaryIndicators.some(indicator => line.includes(indicator))) {
+            // Include this line and next few lines
+            relevantLines.push(lines[i]);
+            for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+                if (lines[j].trim() && !lines[j].startsWith('[')) {
+                    relevantLines.push(lines[j]);
+                }
+            }
+        }
+    }
+
+    if (relevantLines.length > 0) {
+        return relevantLines.slice(0, 5).map(l => `- ${l.trim()}`).join('\n');
+    }
+
+    // Fallback: take last 5 non-empty lines that aren't system messages
+    const fallbackLines = lines
+        .filter(l => !l.startsWith('[') && !l.startsWith('🚀') && !l.startsWith('✅') && !l.startsWith('❌'))
+        .slice(-5);
+
+    if (fallbackLines.length > 0) {
+        return fallbackLines.map(l => `- ${l.trim()}`).join('\n');
+    }
+
+    return '- 작업 완료됨';
 }
 
 interface StartJobParams {
@@ -180,6 +295,20 @@ export function startBackgroundJob(params: StartJobParams): void {
         if (success) {
             ticketService.update(ticketId, { status: 'IN_REVIEW' }, agentId);
         }
+
+        // Get ticket info for work log
+        const ticket = ticketService.getById(ticketId);
+        const member = ticket?.assignee;
+
+        // Append to work log file in project directory
+        appendToWorkLog(job.projectPath, {
+            agentName: job.agentName,
+            agentAvatar: member?.avatar || '🤖',
+            ticketTitle: ticket?.title || 'Unknown Task',
+            success,
+            commitHash,
+            output: job.output,
+        });
 
         // Remove from running jobs after a delay (keep for status check)
         setTimeout(() => {
