@@ -31,6 +31,7 @@ export async function PATCH(
         if (body.profile_image) updates.profile_image = body.profile_image;
         if (body.is_default !== undefined) updates.is_default = body.is_default;
         if (body.can_generate_images !== undefined) updates.can_generate_images = body.can_generate_images ? 1 : 0;
+        if (body.can_log_screenshots !== undefined) updates.can_log_screenshots = body.can_log_screenshots ? 1 : 0;
 
         memberService.update(id, updates);
 

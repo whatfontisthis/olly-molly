@@ -18,6 +18,7 @@ interface Ticket {
         system_prompt: string;
         is_default: number;
         can_generate_images: number;
+        can_log_screenshots: number;
     } | null;
 }
 
