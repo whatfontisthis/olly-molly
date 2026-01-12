@@ -47,3 +47,6 @@ next-env.d.ts
 db/*.sqlite
 db/*.sqlite-shm
 db/*.sqlite-wal
+
+# Sensitive configuration files
+db/image-settings.json
