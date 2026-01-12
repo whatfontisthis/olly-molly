@@ -105,6 +105,7 @@ export function TicketSidebar({
     const [feedback, setFeedback] = useState('');
     const [provider, setProvider] = useState<AgentProvider>('opencode');
     const [executing, setExecuting] = useState(false);
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
     // UI state
     const [showTicketDetails, setShowTicketDetails] = useState(false);
@@ -266,6 +267,11 @@ export function TicketSidebar({
             const data = await res.json();
 
             if (data.success) {
+                // Save job ID for stop functionality
+                if (data.job_id) {
+                    setCurrentJobId(data.job_id);
+                }
+
                 // Refresh conversations to include the new one
                 const convRes = await fetch(`/api/conversations?ticket_id=${ticket.id}`);
                 const convData = await convRes.json();
@@ -292,6 +298,28 @@ export function TicketSidebar({
         } catch (error) {
             alert('Failed to start agent: ' + String(error));
             setExecuting(false);
+        }
+    };
+
+    const handleStopJob = async () => {
+        if (!currentJobId) return;
+
+        try {
+            const res = await fetch(`/api/agent/status?job_id=${currentJobId}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setExecuting(false);
+                setCurrentJobId(null);
+                // Refresh conversations to show cancelled status
+                const convRes = await fetch(`/api/conversations?ticket_id=${ticket?.id}`);
+                const convData = await convRes.json();
+                setConversations(convData.conversations || []);
+            }
+        } catch (error) {
+            console.error('Failed to stop job:', error);
         }
     };
 
@@ -411,6 +439,15 @@ export function TicketSidebar({
                                     🚀 Execute
                                 </Button>
                             )}
+                            {executing && currentJobId && (
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={handleStopJob}
+                                >
+                                    ⏹ Stop
+                                </Button>
+                            )}
                             <button
                                 onClick={() => setShowAgentControls(!showAgentControls)}
                                 className="p-1.5 text-xs text-tertiary hover:text-primary hover:bg-tertiary rounded transition-colors"
@@ -502,6 +539,8 @@ export function TicketSidebar({
                                 conversation={selectedConversation}
                                 messages={conversationMessages}
                                 isRunning={isConversationRunning}
+                                jobId={currentJobId}
+                                onStopJob={handleStopJob}
                             />
                         </div>
                     </div>
