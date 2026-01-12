@@ -31,9 +31,34 @@ export function getImageSettings(): ImageGeneratorSettings {
     return defaultSettings;
 }
 
-export function saveImageSettings(settings: ImageGeneratorSettings): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+export async function loadImageSettingsFromServer(): Promise<ImageGeneratorSettings> {
+    try {
+        const response = await fetch('/api/image/settings');
+        if (response.ok) {
+            const settings = await response.json();
+            // Also update localStorage for quick access
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+            }
+            return { ...defaultSettings, ...settings };
+        }
+    } catch {
+        // Fall back to localStorage
+    }
+    return getImageSettings();
+}
+
+export async function saveImageSettings(settings: ImageGeneratorSettings): Promise<void> {
+    // Save to localStorage for quick access
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+    // Save to server for CLI agent access
+    await fetch('/api/image/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+    });
 }
 
 interface ImageSettingsModalProps {
@@ -45,18 +70,26 @@ export function ImageSettingsModal({ isOpen, onClose }: ImageSettingsModalProps)
     const [settings, setSettings] = useState<ImageGeneratorSettings>(defaultSettings);
     const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [testMessage, setTestMessage] = useState('');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            setSettings(getImageSettings());
+            loadImageSettingsFromServer().then(setSettings);
             setTestStatus('idle');
             setTestMessage('');
         }
     }, [isOpen]);
 
-    const handleSave = () => {
-        saveImageSettings(settings);
-        onClose();
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await saveImageSettings(settings);
+            onClose();
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleTest = async () => {

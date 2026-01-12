@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateImage, checkComfyServer, ImageGeneratorSettings } from '@/lib/image-client';
+import { generateImage, checkComfyServer } from '@/lib/image-client';
+import { loadSettingsFromFile, ImageGeneratorSettings } from '@/app/api/image/settings/route';
 
 interface GenerateRequest {
     prompt: string;
@@ -9,14 +10,18 @@ interface GenerateRequest {
 }
 
 function parseSettings(request: NextRequest): ImageGeneratorSettings | null {
+    // First try to get settings from header (for frontend calls with fresh settings)
     const settingsHeader = request.headers.get('X-Image-Settings');
-    if (!settingsHeader) return null;
-
-    try {
-        return JSON.parse(settingsHeader);
-    } catch {
-        return null;
+    if (settingsHeader) {
+        try {
+            return JSON.parse(settingsHeader);
+        } catch {
+            // Fall through to file-based settings
+        }
     }
+
+    // Fall back to file-based settings (for CLI agent calls)
+    return loadSettingsFromFile();
 }
 
 export async function POST(request: NextRequest) {
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
 
         if (!settings || settings.provider === 'off') {
             return NextResponse.json(
-                { success: false, error: 'Image generation is not configured. Please configure it in Settings.' },
+                { success: false, error: 'Image generation is not configured. Please configure it in Settings (⚙️ button in header).' },
                 { status: 400 }
             );
         }
