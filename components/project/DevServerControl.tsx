@@ -126,8 +126,8 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
             ) : (
                 <>
                     <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${external
-                            ? 'bg-amber-500/10 text-amber-400'
-                            : 'bg-emerald-500/10 text-emerald-400'
+                        ? 'bg-amber-500/10 text-amber-400'
+                        : 'bg-emerald-500/10 text-emerald-400'
                         }`}
                         title={external ? 'Running externally (started from terminal)' : 'Running from dashboard'}
                     >
@@ -144,21 +144,19 @@ export function DevServerControl({ projectId, projectName }: DevServerControlPro
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                     </button>
-                    {!external && (
-                        <button
-                            onClick={handleStop}
-                            disabled={loading}
-                            className={`p-1.5 rounded-lg transition-colors ${loading
-                                ? 'text-[var(--text-muted)] cursor-not-allowed'
-                                : 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-                                }`}
-                            title="Stop dev server"
-                        >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <rect x="6" y="6" width="12" height="12" rx="1" />
-                            </svg>
-                        </button>
-                    )}
+                    <button
+                        onClick={handleStop}
+                        disabled={loading}
+                        className={`p-1.5 rounded-lg transition-colors ${loading
+                            ? 'text-[var(--text-muted)] cursor-not-allowed'
+                            : 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+                            }`}
+                        title={external ? 'Stop external dev server' : 'Stop dev server'}
+                    >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <rect x="6" y="6" width="12" height="12" rx="1" />
+                        </svg>
+                    </button>
                 </>
             )}
         </div>

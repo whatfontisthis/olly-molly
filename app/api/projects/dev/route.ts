@@ -279,6 +279,23 @@ export async function POST(request: NextRequest) {
                     server.process.kill('SIGTERM');
                 }
                 runningDevServers.delete(projectId);
+                return NextResponse.json({ success: true, running: false });
+            }
+
+            // Check for externally running server and kill it
+            const project = projectService.getById(projectId);
+            if (project) {
+                const externalServer = detectExternalDevServer(project.path);
+                if (externalServer.running && externalServer.pid) {
+                    try {
+                        // Kill the external process
+                        process.kill(externalServer.pid, 'SIGTERM');
+                        return NextResponse.json({ success: true, running: false });
+                    } catch (error) {
+                        console.error('Failed to kill external dev server:', error);
+                        return NextResponse.json({ error: 'Failed to stop external server' }, { status: 500 });
+                    }
+                }
             }
 
             return NextResponse.json({ success: true, running: false });
