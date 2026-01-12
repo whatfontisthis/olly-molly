@@ -24,8 +24,12 @@ interface Member {
   role: string;
   name: string;
   avatar?: string | null;
+  profile_image?: string | null; // Added based on common pattern for avatar/profile_image
   system_prompt: string;
   is_default: number;
+  can_generate_images: number; // Added as per instruction
+  created_at?: string; // Added based on common pattern for timestamps
+  updated_at?: string; // Added based on common pattern for timestamps
 }
 
 interface Ticket {

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS members (
   profile_image TEXT,
   system_prompt TEXT NOT NULL,
   is_default INTEGER DEFAULT 0,
+  can_generate_images INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

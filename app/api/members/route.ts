@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { role, name, avatar, system_prompt } = body;
+        const { role, name, avatar, system_prompt, can_generate_images } = body;
 
         // Validation
         if (!role || !name || !system_prompt) {
@@ -24,7 +24,13 @@ export async function POST(request: Request) {
             );
         }
 
-        const newMember = memberService.create({ role, name, avatar, system_prompt });
+        const newMember = memberService.create({
+            role,
+            name,
+            avatar,
+            system_prompt,
+            can_generate_images: can_generate_images === true || can_generate_images === 1
+        });
         return NextResponse.json(newMember, { status: 201 });
     } catch (error) {
         console.error('Error creating member:', error);

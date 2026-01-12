@@ -16,6 +16,7 @@ interface Ticket {
         role: string;
         system_prompt: string;
         is_default: number;
+        can_generate_images: number;
     } | null;
 }
 

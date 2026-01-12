@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 interface AddMemberModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: { role: string; name: string; avatar: string; system_prompt: string }) => void;
+    onSave: (member: { role: string; name: string; avatar: string; system_prompt: string; can_generate_images?: boolean }) => void;
 }
 
 const roleOptions = [
@@ -35,6 +35,7 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
     const [name, setName] = useState('');
     const [avatar, setAvatar] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
+    const [canGenerateImages, setCanGenerateImages] = useState(false);
 
     const handleRoleSelect = (selectedRole: string, emoji: string, prompt: string) => {
         setRole(selectedRole);
@@ -42,6 +43,8 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
         if (!avatar) {
             setAvatar(emoji);
         }
+        // Auto-enable for FE_DEV and BUG_HUNTER based on previous logic, but allow toggle
+        setCanGenerateImages(selectedRole === 'FE_DEV' || selectedRole === 'Bug Hunter');
     };
 
     const handleSave = () => {
@@ -51,12 +54,14 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
                 name: name.trim(),
                 avatar: avatar.trim() || '👤',
                 system_prompt: systemPrompt.trim(),
+                can_generate_images: canGenerateImages
             });
             // Reset form
             setRole('');
             setName('');
             setAvatar('');
             setSystemPrompt('');
+            setCanGenerateImages(false);
             onClose();
         }
     };
@@ -67,6 +72,7 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
         setName('');
         setAvatar('');
         setSystemPrompt('');
+        setCanGenerateImages(false);
         onClose();
     };
 
@@ -117,6 +123,23 @@ export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps)
                     placeholder="e.g., 🌟 (leave empty for default 👤)"
                     maxLength={2}
                 />
+
+                {/* Capabilities */}
+                <div className="flex items-center gap-2 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                    <input
+                        type="checkbox"
+                        id="canGenerateImages"
+                        checked={canGenerateImages}
+                        onChange={(e) => setCanGenerateImages(e.target.checked)}
+                        className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                    />
+                    <label htmlFor="canGenerateImages" className="text-sm font-medium text-[var(--text-primary)] cursor-pointer select-none">
+                        🎨 Allow Image Generation Tool
+                    </label>
+                    <span className="text-xs text-[var(--text-tertiary)] ml-auto">
+                        Requires configured image settings
+                    </span>
+                </div>
 
                 {/* System Prompt */}
                 <Textarea

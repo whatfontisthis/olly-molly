@@ -165,6 +165,7 @@ export interface Member {
   profile_image: string | null;
   system_prompt: string;
   is_default: number;
+  can_generate_images: number;
   created_at: string;
   updated_at: string;
 }
@@ -296,12 +297,13 @@ export const memberService = {
     return this.getById(id);
   },
 
-  create(data: { role: string; name: string; avatar?: string; system_prompt: string }): Member {
+  create(data: { role: string; name: string; avatar?: string; system_prompt: string; can_generate_images?: boolean }): Member {
     const id = uuidv4();
+    const canGenerate = data.can_generate_images ? 1 : 0;
     getDb().prepare(`
-      INSERT INTO members (id, role, name, avatar, system_prompt, is_default)
-      VALUES (?, ?, ?, ?, ?, 0)
-    `).run(id, data.role, data.name, data.avatar || null, data.system_prompt);
+      INSERT INTO members (id, role, name, avatar, system_prompt, is_default, can_generate_images)
+      VALUES (?, ?, ?, ?, ?, 0, ?)
+    `).run(id, data.role, data.name, data.avatar || null, data.system_prompt, canGenerate);
     return this.getById(id)!;
   },
 

@@ -12,6 +12,7 @@ interface Member {
     avatar?: string | null;
     system_prompt: string;
     is_default: number;
+    can_generate_images: number;
 }
 
 interface TeamPanelProps {

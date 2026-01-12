@@ -25,11 +25,16 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const member = memberService.update(id, body);
-        if (!member) {
-            return NextResponse.json({ error: 'Member not found' }, { status: 404 });
-        }
-        return NextResponse.json(member);
+
+        const updates: any = {};
+        if (body.system_prompt) updates.system_prompt = body.system_prompt;
+        if (body.profile_image) updates.profile_image = body.profile_image;
+        if (body.is_default !== undefined) updates.is_default = body.is_default;
+        if (body.can_generate_images !== undefined) updates.can_generate_images = body.can_generate_images ? 1 : 0;
+
+        memberService.update(id, updates);
+
+        return NextResponse.json(memberService.getById(id));
     } catch (error) {
         console.error('Error updating member:', error);
         return NextResponse.json({ error: 'Failed to update member' }, { status: 500 });

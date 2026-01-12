@@ -17,6 +17,7 @@ interface Member {
     role: string;
     system_prompt: string;
     is_default: number;
+    can_generate_images: number;
 }
 
 interface Ticket {

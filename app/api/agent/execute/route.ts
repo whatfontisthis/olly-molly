@@ -16,6 +16,7 @@ function buildAgentPrompt(ticket: {
     name: string;
     role: string;
     system_prompt: string;
+    can_generate_images: number;
 }, project: {
     name: string;
     path: string;
@@ -28,8 +29,8 @@ function buildAgentPrompt(ticket: {
 2. TOOL USAGE: You MUST use the **Playwright MCP** (https://github.com/microsoft/playwright-mcp) tools for automated testing. verify the available tools and use them for browser automation and testing. Do NOT rely solely on manual terminal commands.`
         : '';
 
-    // Image generation instruction for FE_DEV and BUG_HUNTER
-    const canGenerateImages = agent.role === 'FE_DEV' || agent.role === 'BUG_HUNTER';
+    // Image generation instruction based on member capability
+    const canGenerateImages = agent.can_generate_images === 1;
     const imageGenerationInstruction = canGenerateImages
         ? `\n\nIMAGE GENERATION (if configured in Settings):
 If you need images for your implementation (backgrounds, icons, illustrations, etc.), you can generate them using the Image Generation API:
