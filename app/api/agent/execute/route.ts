@@ -36,8 +36,8 @@ function buildAgentPrompt(ticket: {
 If you need images for your implementation (backgrounds, icons, illustrations, etc.), you can generate them using the Image Generation API:
 - Endpoint: POST http://localhost:1234/api/image/generate
 - Body: { "prompt": "detailed image description", "width": 1024, "height": 1024, "projectPath": "${project.path}" }
-- NOTE: You must include 'X-Image-Settings' header with settings from localStorage
-- Example: curl -X POST http://localhost:1234/api/image/generate -H "Content-Type: application/json" -d '{"prompt": "modern dark theme dashboard background with subtle gradient", "width": 1920, "height": 1080, "projectPath": "${project.path}"}'
+- NOTE: The server will use the provider configured in the app settings. No manual configuration needed.
+- Example: curl -X POST http://localhost:1234/api/image/generate -H "Content-Type: application/json" -d '{"prompt": "modern dark theme dashboard background", "width": 1024, "height": 1024, "projectPath": "${project.path}"}'
 - Generated images will be saved to ${project.path}/public/generated/
 - Use descriptive prompts for best results (style, colors, composition)
 - Supported sizes: any width/height, defaults to 1024x1024
