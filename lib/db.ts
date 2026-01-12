@@ -267,7 +267,7 @@ export const memberService = {
     return this.getById(id);
   },
 
-  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'profile_image' | 'system_prompt'>>): Member | undefined {
+  update(id: string, data: Partial<Pick<Member, 'name' | 'avatar' | 'profile_image' | 'system_prompt' | 'can_generate_images'>>): Member | undefined {
     const updates: string[] = [];
     const values: (string | null)[] = [];
 
@@ -286,6 +286,10 @@ export const memberService = {
     if (data.system_prompt !== undefined) {
       updates.push('system_prompt = ?');
       values.push(data.system_prompt);
+    }
+    if (data.can_generate_images !== undefined) {
+      updates.push('can_generate_images = ?');
+      values.push(data.can_generate_images ? '1' : '0');
     }
 
     if (updates.length > 0) {
