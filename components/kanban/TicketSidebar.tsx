@@ -203,7 +203,7 @@ export function TicketSidebar({
     };
 
     const handleExecuteAgent = async () => {
-        if (!ticket || !ticket.assignee_id) return;
+        if (!ticket || !assigneeId) return;
 
         setExecuting(true);
 
@@ -341,7 +341,7 @@ export function TicketSidebar({
             )}
 
             {/* AI Agent Execution Section */}
-            {ticket.assignee_id && (
+            {assigneeId && (
                 <div className="flex-1 flex flex-col min-h-0">
                     {/* Minimal Agent Control Bar */}
                     <div className="p-2 border-b border-primary flex items-center justify-between flex-shrink-0 bg-tertiary/50">
@@ -461,7 +461,7 @@ export function TicketSidebar({
                 </div>
             )}
 
-            {!ticket.assignee_id && (
+            {!assigneeId && (
                 <div className="flex-1 flex items-center justify-center text-muted">
                     <div className="text-center">
                         <p className="text-lg mb-2">👤</p>
