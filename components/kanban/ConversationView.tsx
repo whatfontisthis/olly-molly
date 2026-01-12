@@ -7,9 +7,11 @@ interface ConversationViewProps {
     conversation: Conversation | null;
     messages: ConversationMessage[];
     isRunning?: boolean;
+    jobId?: string | null;
+    onStopJob?: () => void;
 }
 
-export function ConversationView({ conversation, messages, isRunning = false }: ConversationViewProps) {
+export function ConversationView({ conversation, messages, isRunning = false, jobId = null, onStopJob }: ConversationViewProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [hasInitiallyScrolled, setHasInitiallyScrolled] = useState(false);
     const prevConversationId = useRef<string | null>(null);
@@ -105,6 +107,15 @@ export function ConversationView({ conversation, messages, isRunning = false }: 
                     </span>
                     {isRunning && (
                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                    )}
+                    {isRunning && jobId && onStopJob && (
+                        <button
+                            onClick={onStopJob}
+                            className="ml-2 px-3 py-1 text-xs font-medium bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                            title="Stop running agent"
+                        >
+                            ⏹ Stop
+                        </button>
                     )}
                 </div>
             </div>
