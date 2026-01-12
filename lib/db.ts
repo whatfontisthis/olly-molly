@@ -1,25 +1,55 @@
 import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
+// Check if we're in build phase - skip DB operations during build
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.argv.includes('build') ||
+  process.env.npm_lifecycle_event === 'build';
+
 // Database file path
 const DB_PATH = path.join(process.cwd(), 'db', 'dev.sqlite');
 
-// Ensure db directory exists
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+// Lazy database connection - only initialize when actually needed
+let _db: DatabaseType | null = null;
+let _initialized = false;
+
+function getDb(): DatabaseType {
+  if (_db) return _db;
+
+  // During build phase, throw an error that will be caught by try-catch
+  if (isBuildPhase) {
+    throw new Error('Database not available during build phase');
+  }
+
+  // Ensure db directory exists
+  const dbDir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
+  // Create database connection
+  _db = new Database(DB_PATH);
+  _db.pragma('journal_mode = WAL');
+  _db.pragma('busy_timeout = 5000'); // Wait up to 5 seconds for locks
+
+  // Initialize schema and run migrations only once
+  if (!_initialized) {
+    initializeDatabase(_db);
+    runMigrations(_db);
+    _initialized = true;
+  }
+
+  return _db;
 }
 
-// Create database connection
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('busy_timeout = 5000'); // Wait up to 5 seconds for locks
-
 // Initialize database schema
-function initializeDatabase() {
+function initializeDatabase(db: DatabaseType) {
   const schemaPath = path.join(process.cwd(), 'db', 'schema.sql');
+  if (!fs.existsSync(schemaPath)) return;
+
   const schema = fs.readFileSync(schemaPath, 'utf-8');
   db.exec(schema);
 
@@ -38,11 +68,8 @@ function initializeDatabase() {
   }
 }
 
-// Initialize on first load
-initializeDatabase();
-
 // Run migrations for columns that may not exist in older databases
-function runMigrations() {
+function runMigrations(db: DatabaseType) {
   // Check if profile_image column exists in members table
   const tableInfo = db.prepare("PRAGMA table_info(members)").all() as { name: string }[];
   const hasProfileImage = tableInfo.some(col => col.name === 'profile_image');
@@ -114,8 +141,6 @@ When given a bug report, quickly identify the issue, implement a fix, and verify
     `).run();
   }
 }
-
-runMigrations();
 
 // Types
 export interface Member {
@@ -206,19 +231,19 @@ export interface ConversationMessage {
 // Member operations
 export const memberService = {
   getAll(): Member[] {
-    return db.prepare('SELECT * FROM members ORDER BY role').all() as Member[];
+    return getDb().prepare('SELECT * FROM members ORDER BY role').all() as Member[];
   },
 
   getById(id: string): Member | undefined {
-    return db.prepare('SELECT * FROM members WHERE id = ?').get(id) as Member | undefined;
+    return getDb().prepare('SELECT * FROM members WHERE id = ?').get(id) as Member | undefined;
   },
 
   getByRole(role: string): Member | undefined {
-    return db.prepare('SELECT * FROM members WHERE role = ?').get(role) as Member | undefined;
+    return getDb().prepare('SELECT * FROM members WHERE role = ?').get(role) as Member | undefined;
   },
 
   updateSystemPrompt(id: string, systemPrompt: string): Member | undefined {
-    db.prepare(`
+    getDb().prepare(`
       UPDATE members 
       SET system_prompt = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
@@ -250,7 +275,7 @@ export const memberService = {
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
       values.push(id);
-      db.prepare(`UPDATE members SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+      getDb().prepare(`UPDATE members SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     }
 
     return this.getById(id);
@@ -283,7 +308,7 @@ export const ticketService = {
     }
 
     query += ' ORDER BY t.created_at DESC';
-    const tickets = db.prepare(query).all(...params) as (Ticket & { assignee_name?: string; assignee_avatar?: string; assignee_role?: string })[];
+    const tickets = getDb().prepare(query).all(...params) as (Ticket & { assignee_name?: string; assignee_avatar?: string; assignee_role?: string })[];
     return tickets.map(t => ({
       ...t,
       assignee: t.assignee_id ? {
@@ -296,7 +321,7 @@ export const ticketService = {
   },
 
   getById(id: string): Ticket | undefined {
-    const ticket = db.prepare(`
+    const ticket = getDb().prepare(`
       SELECT t.*, m.name as assignee_name, m.avatar as assignee_avatar, m.role as assignee_role
       FROM tickets t
       LEFT JOIN members m ON t.assignee_id = m.id
@@ -318,7 +343,7 @@ export const ticketService = {
 
   create(data: { title: string; description?: string; priority?: Ticket['priority']; assignee_id?: string; project_id?: string; created_by?: string }): Ticket {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO tickets (id, title, description, priority, assignee_id, project_id, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, data.title, data.description || null, data.priority || 'MEDIUM', data.assignee_id || null, data.project_id || null, data.created_by || null);
@@ -394,14 +419,14 @@ export const ticketService = {
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
       values.push(id);
-      db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+      getDb().prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     }
 
     return this.getById(id);
   },
 
   delete(id: string): boolean {
-    const result = db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
+    const result = getDb().prepare('DELETE FROM tickets WHERE id = ?').run(id);
     return result.changes > 0;
   }
 };
@@ -410,7 +435,7 @@ export const ticketService = {
 export const activityService = {
   log(data: { ticket_id: string; member_id: string | null; action: string; old_value?: string | null; new_value?: string | null; details?: string | null }): ActivityLog {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO activity_logs (id, ticket_id, member_id, action, old_value, new_value, details)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, data.ticket_id, data.member_id, data.action, data.old_value || null, data.new_value || null, data.details || null);
@@ -418,7 +443,7 @@ export const activityService = {
   },
 
   getById(id: string): ActivityLog | undefined {
-    return db.prepare(`
+    return getDb().prepare(`
       SELECT al.*, m.name as member_name, m.avatar as member_avatar
       FROM activity_logs al
       LEFT JOIN members m ON al.member_id = m.id
@@ -427,7 +452,7 @@ export const activityService = {
   },
 
   getByTicketId(ticketId: string): ActivityLog[] {
-    const logs = db.prepare(`
+    const logs = getDb().prepare(`
       SELECT al.*, m.name as member_name, m.avatar as member_avatar, m.role as member_role
       FROM activity_logs al
       LEFT JOIN members m ON al.member_id = m.id
@@ -450,20 +475,20 @@ export const activityService = {
 // Project operations
 export const projectService = {
   getAll(): Project[] {
-    return db.prepare('SELECT * FROM projects ORDER BY is_active DESC, name ASC').all() as Project[];
+    return getDb().prepare('SELECT * FROM projects ORDER BY is_active DESC, name ASC').all() as Project[];
   },
 
   getById(id: string): Project | undefined {
-    return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined;
+    return getDb().prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined;
   },
 
   getActive(): Project | undefined {
-    return db.prepare('SELECT * FROM projects WHERE is_active = 1').get() as Project | undefined;
+    return getDb().prepare('SELECT * FROM projects WHERE is_active = 1').get() as Project | undefined;
   },
 
   create(data: { name: string; path: string; description?: string }): Project {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO projects (id, name, path, description)
       VALUES (?, ?, ?, ?)
     `).run(id, data.name, data.path, data.description || null);
@@ -472,14 +497,14 @@ export const projectService = {
 
   setActive(id: string): Project | undefined {
     // Deactivate all projects first
-    db.prepare('UPDATE projects SET is_active = 0').run();
+    getDb().prepare('UPDATE projects SET is_active = 0').run();
     // Activate the selected project
-    db.prepare('UPDATE projects SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    getDb().prepare('UPDATE projects SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     return this.getById(id);
   },
 
   delete(id: string): boolean {
-    const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    const result = getDb().prepare('DELETE FROM projects WHERE id = ?').run(id);
     return result.changes > 0;
   }
 };
@@ -494,7 +519,7 @@ export const agentWorkLogService = {
     prompt?: string;
   }): AgentWorkLog {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO agent_work_logs (id, ticket_id, agent_id, project_id, command, prompt)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(id, data.ticket_id, data.agent_id, data.project_id, data.command, data.prompt || null);
@@ -502,11 +527,11 @@ export const agentWorkLogService = {
   },
 
   getById(id: string): AgentWorkLog | undefined {
-    return db.prepare('SELECT * FROM agent_work_logs WHERE id = ?').get(id) as AgentWorkLog | undefined;
+    return getDb().prepare('SELECT * FROM agent_work_logs WHERE id = ?').get(id) as AgentWorkLog | undefined;
   },
 
   getByTicketId(ticketId: string): AgentWorkLog[] {
-    return db.prepare(`
+    return getDb().prepare(`
       SELECT awl.*, m.name as agent_name, m.avatar as agent_avatar, p.name as project_name
       FROM agent_work_logs awl
       LEFT JOIN members m ON awl.agent_id = m.id
@@ -527,7 +552,7 @@ export const agentWorkLogService = {
     const startTime = new Date(log.started_at).getTime();
     const duration = Date.now() - startTime;
 
-    db.prepare(`
+    getDb().prepare(`
       UPDATE agent_work_logs 
       SET status = ?, output = ?, git_commit_hash = ?, completed_at = CURRENT_TIMESTAMP, duration_ms = ?
       WHERE id = ?
@@ -547,7 +572,7 @@ export const conversationService = {
     feedback?: string;
   }): Conversation {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO conversations (id, ticket_id, agent_id, provider, prompt, feedback)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(id, data.ticket_id, data.agent_id, data.provider, data.prompt || null, data.feedback || null);
@@ -555,7 +580,7 @@ export const conversationService = {
   },
 
   getById(id: string): Conversation | undefined {
-    const conversation = db.prepare(`
+    const conversation = getDb().prepare(`
       SELECT c.*, m.name as agent_name, m.avatar as agent_avatar, m.role as agent_role
       FROM conversations c
       LEFT JOIN members m ON c.agent_id = m.id
@@ -576,7 +601,7 @@ export const conversationService = {
   },
 
   getByTicketId(ticketId: string): Conversation[] {
-    const conversations = db.prepare(`
+    const conversations = getDb().prepare(`
       SELECT c.*, m.name as agent_name, m.avatar as agent_avatar, m.role as agent_role
       FROM conversations c
       LEFT JOIN members m ON c.agent_id = m.id
@@ -596,7 +621,7 @@ export const conversationService = {
   },
 
   updateStatus(id: string, status: Conversation['status'], commitHash?: string): void {
-    db.prepare(`
+    getDb().prepare(`
       UPDATE conversations 
       SET status = ?, git_commit_hash = ?
       WHERE id = ?
@@ -607,7 +632,7 @@ export const conversationService = {
     status: Conversation['status'];
     git_commit_hash?: string;
   }): void {
-    db.prepare(`
+    getDb().prepare(`
       UPDATE conversations 
       SET status = ?, git_commit_hash = ?, completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -619,7 +644,7 @@ export const conversationService = {
 export const conversationMessageService = {
   create(conversationId: string, content: string, type: ConversationMessage['message_type'] = 'log'): ConversationMessage {
     const id = uuidv4();
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO conversation_messages (id, conversation_id, content, message_type)
       VALUES (?, ?, ?, ?)
     `).run(id, conversationId, content, type);
@@ -627,11 +652,11 @@ export const conversationMessageService = {
   },
 
   getById(id: string): ConversationMessage | undefined {
-    return db.prepare('SELECT * FROM conversation_messages WHERE id = ?').get(id) as ConversationMessage | undefined;
+    return getDb().prepare('SELECT * FROM conversation_messages WHERE id = ?').get(id) as ConversationMessage | undefined;
   },
 
   getByConversationId(conversationId: string): ConversationMessage[] {
-    return db.prepare(`
+    return getDb().prepare(`
       SELECT * FROM conversation_messages 
       WHERE conversation_id = ? 
       ORDER BY created_at ASC
@@ -643,4 +668,5 @@ export const conversationMessageService = {
   }
 };
 
-export default db;
+// Export the lazy getter instead of direct db instance
+export default { getDb };
