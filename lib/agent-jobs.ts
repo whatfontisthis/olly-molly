@@ -16,6 +16,19 @@ const CLAUDE_STREAM_ARGS = [
 ];
 const STREAM_FLUSH_INTERVAL_MS = 1000;
 const STREAM_FLUSH_CHARS = 200;
+const CLAUDE_MODEL_ENV_KEYS = ['CLAUDE_MODEL', 'CLAUDE_CODE_MODEL', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_MODEL'];
+const OPENCODE_MODEL_ENV_KEYS = ['OPENCODE_MODEL', 'OPENCODE_DEFAULT_MODEL'];
+
+function getConfiguredModel(provider: AgentProvider): string | null {
+    const keys = provider === 'claude' ? CLAUDE_MODEL_ENV_KEYS : OPENCODE_MODEL_ENV_KEYS;
+    for (const key of keys) {
+        const value = process.env[key];
+        if (value && value.trim()) {
+            return value.trim();
+        }
+    }
+    return null;
+}
 
 interface RunningJob {
     id: string;
@@ -315,16 +328,18 @@ export function startBackgroundJob(params: StartJobParams): void {
     let startMessage: string;
     const isClaudeStream = provider === 'claude';
 
+    const modelLabel = getConfiguredModel(provider) ?? 'default';
+
     if (provider === 'opencode') {
         execPath = OPENCODE_CMD;
         // Use stdin for prompt to avoid shell escaping issues
         args = ['run', '-'];
-        startMessage = `🚀 Starting OpenCode in ${projectPath}...\n\n`;
+        startMessage = `🚀 Starting OpenCode in ${projectPath}...\nModel: ${modelLabel}\n\n`;
     } else {
         execPath = CLAUDE_CMD;
         // Use stdin for prompt to avoid shell escaping issues
         args = CLAUDE_STREAM_ARGS;
-        startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
+        startMessage = `🚀 Starting Claude Code in ${projectPath}...\nModel: ${modelLabel}\n\n`;
     }
 
     // On Windows, shell: true is needed to find commands in PATH
