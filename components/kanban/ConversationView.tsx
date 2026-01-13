@@ -88,6 +88,26 @@ export function ConversationView({ conversation, messages, isRunning = false, jo
         }
     };
 
+    const parseTimestamp = (value: string) => {
+        const hasTimezone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value);
+        const normalized = hasTimezone
+            ? value
+            : `${value.replace(' ', 'T')}Z`;
+        return new Date(normalized);
+    };
+
+    const formatDuration = (start: Date, end: Date) => {
+        const durationMs = Math.max(0, end.getTime() - start.getTime());
+        const totalSeconds = Math.floor(durationMs / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+        if (minutes > 0) return `${minutes}m ${seconds}s`;
+        return `${seconds}s`;
+    };
+
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -143,8 +163,14 @@ export function ConversationView({ conversation, messages, isRunning = false, jo
             {conversation.completed_at && (
                 <div className="p-3 border-t border-primary bg-tertiary flex-shrink-0">
                     <div className="flex items-center justify-between text-xs text-muted">
-                        <span>Started: {new Date(conversation.started_at).toLocaleString()}</span>
-                        <span>Completed: {new Date(conversation.completed_at).toLocaleString()}</span>
+                        <span>Started: {parseTimestamp(conversation.started_at).toLocaleString()}</span>
+                        <span>Completed: {parseTimestamp(conversation.completed_at).toLocaleString()}</span>
+                        <span>
+                            Duration: {formatDuration(
+                                parseTimestamp(conversation.started_at),
+                                parseTimestamp(conversation.completed_at)
+                            )}
+                        </span>
                     </div>
                     {conversation.git_commit_hash && (
                         <div className="mt-1 text-xs text-emerald-400">

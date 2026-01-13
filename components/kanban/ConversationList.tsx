@@ -9,6 +9,14 @@ interface ConversationListProps {
 }
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+    const parseTimestamp = (value: string) => {
+        const hasTimezone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value);
+        const normalized = hasTimezone
+            ? value
+            : `${value.replace(' ', 'T')}Z`;
+        return new Date(normalized);
+    };
+
     const getStatusIcon = (status: Conversation['status']) => {
         switch (status) {
             case 'running':
@@ -29,7 +37,8 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
     };
 
     const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
+        const date = parseTimestamp(dateString);
+        if (Number.isNaN(date.getTime())) return '';
         const now = new Date();
         const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
 
