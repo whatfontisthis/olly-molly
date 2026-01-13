@@ -3,10 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { conversationService, conversationMessageService, activityService, ticketService } from './db';
 
-export type AgentProvider = 'claude' | 'opencode';
+export type AgentProvider = 'claude' | 'opencode' | 'codex';
 
 const CLAUDE_CMD = 'claude';
 const OPENCODE_CMD = 'opencode';
+const CODEX_CMD = 'codex';
 const CLAUDE_STREAM_ARGS = [
     '--print',
     '--dangerously-skip-permissions',
@@ -18,9 +19,18 @@ const STREAM_FLUSH_INTERVAL_MS = 1000;
 const STREAM_FLUSH_CHARS = 200;
 const CLAUDE_MODEL_ENV_KEYS = ['CLAUDE_MODEL', 'CLAUDE_CODE_MODEL', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_MODEL'];
 const OPENCODE_MODEL_ENV_KEYS = ['OPENCODE_MODEL', 'OPENCODE_DEFAULT_MODEL'];
+const CODEX_MODEL_ENV_KEYS = ['CODEX_MODEL', 'CODEX_DEFAULT_MODEL', 'OPENAI_MODEL', 'OPENAI_DEFAULT_MODEL'];
+const CODEX_ARGS_ENV_KEY = 'CODEX_CLI_ARGS';
 
 function getConfiguredModel(provider: AgentProvider): string | null {
-    const keys = provider === 'claude' ? CLAUDE_MODEL_ENV_KEYS : OPENCODE_MODEL_ENV_KEYS;
+    let keys: string[];
+    if (provider === 'claude') {
+        keys = CLAUDE_MODEL_ENV_KEYS;
+    } else if (provider === 'opencode') {
+        keys = OPENCODE_MODEL_ENV_KEYS;
+    } else {
+        keys = CODEX_MODEL_ENV_KEYS;
+    }
     for (const key of keys) {
         const value = process.env[key];
         if (value && value.trim()) {
@@ -28,6 +38,26 @@ function getConfiguredModel(provider: AgentProvider): string | null {
         }
     }
     return null;
+}
+
+function getCodexInvocation(prompt: string): { args: string[]; useStdin: boolean } {
+    const rawArgs = process.env[CODEX_ARGS_ENV_KEY];
+    if (!rawArgs) {
+        return { args: ['exec', '--dangerously-bypass-approvals-and-sandbox', '-'], useStdin: true };
+    }
+    const parsed = rawArgs.split(' ').map(arg => arg.trim()).filter(Boolean);
+    if (parsed.length === 0) {
+        return { args: ['exec', '--dangerously-bypass-approvals-and-sandbox', '-'], useStdin: true };
+    }
+    const hasExec = parsed.includes('exec');
+    const baseArgs = hasExec ? parsed : ['exec', ...parsed];
+    if (baseArgs.includes('{prompt}')) {
+        return { args: baseArgs.map(arg => (arg === '{prompt}' ? prompt : arg)), useStdin: false };
+    }
+    if (baseArgs.includes('-')) {
+        return { args: baseArgs, useStdin: true };
+    }
+    return { args: [...baseArgs, prompt], useStdin: false };
 }
 
 interface RunningJob {
@@ -326,6 +356,7 @@ export function startBackgroundJob(params: StartJobParams): void {
     let execPath: string;
     let args: string[];
     let startMessage: string;
+    let useStdin = true;
     const isClaudeStream = provider === 'claude';
 
     const modelLabel = getConfiguredModel(provider) ?? 'default';
@@ -335,6 +366,13 @@ export function startBackgroundJob(params: StartJobParams): void {
         // Use stdin for prompt to avoid shell escaping issues
         args = ['run', '-'];
         startMessage = `🚀 Starting OpenCode in ${projectPath}...\nModel: ${modelLabel}\n\n`;
+    } else if (provider === 'codex') {
+        execPath = CODEX_CMD;
+        // Use stdin for prompt to avoid shell escaping issues
+        const codex = getCodexInvocation(prompt);
+        args = codex.args;
+        useStdin = codex.useStdin;
+        startMessage = `🚀 Starting Codex CLI in ${projectPath}...\nModel: ${modelLabel}\n\n`;
     } else {
         execPath = CLAUDE_CMD;
         // Use stdin for prompt to avoid shell escaping issues
@@ -353,9 +391,11 @@ export function startBackgroundJob(params: StartJobParams): void {
         stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    // Write prompt to stdin
-    agentProcess.stdin?.write(prompt);
-    agentProcess.stdin?.end();
+    if (useStdin) {
+        // Write prompt to stdin
+        agentProcess.stdin?.write(prompt);
+        agentProcess.stdin?.end();
+    }
 
     const job: RunningJob = {
         id: jobId,

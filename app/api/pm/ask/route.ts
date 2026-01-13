@@ -7,7 +7,7 @@ import path from 'path';
 /**
  * PM Agent - Ask questions about project status
  * 
- * Uses opencode or claude CLI to answer questions about the project
+ * Uses codex, opencode, or claude CLI to answer questions about the project
  * based on AGENT_WORK_LOG.md and project structure.
  */
 
@@ -30,7 +30,7 @@ IMPORTANT RULES:
 - If you don't have information, say so clearly`;
 
 // Detect available CLI tool
-async function detectCLI(): Promise<'claude' | 'opencode' | null> {
+async function detectCLI(): Promise<'claude' | 'opencode' | 'codex' | null> {
     const isWindows = process.platform === 'win32';
     const whichCmd = isWindows ? 'where' : 'which';
 
@@ -42,6 +42,7 @@ async function detectCLI(): Promise<'claude' | 'opencode' | null> {
         });
     };
 
+    if (await checkCommand('codex')) return 'codex';
     if (await checkCommand('claude')) return 'claude';
     if (await checkCommand('opencode')) return 'opencode';
     return null;
@@ -79,7 +80,7 @@ async function askWithCLI(question: string, projectPath: string): Promise<string
     const cli = await detectCLI();
 
     if (!cli) {
-        throw new Error('No CLI tool available. Please install either claude or opencode.');
+        throw new Error('No CLI tool available. Please install codex, claude, or opencode.');
     }
 
     const projectContext = getProjectContext(projectPath);
@@ -99,8 +100,28 @@ ${projectContext}
         let errorOutput = '';
 
         let args: string[];
+        let useStdin = true;
         if (cli === 'opencode') {
             args = ['run', '-'];
+        } else if (cli === 'codex') {
+            const rawArgs = process.env.CODEX_CLI_ARGS;
+            const parsed = rawArgs ? rawArgs.split(' ').map(arg => arg.trim()).filter(Boolean) : [];
+            if (parsed.length === 0) {
+                args = ['exec', '--dangerously-bypass-approvals-and-sandbox', '-'];
+                useStdin = true;
+            } else {
+                const hasExec = parsed.includes('exec');
+                const baseArgs = hasExec ? parsed : ['exec', ...parsed];
+                if (baseArgs.includes('{prompt}')) {
+                    args = baseArgs.map(arg => (arg === '{prompt}' ? fullPrompt : arg));
+                    useStdin = false;
+                } else if (baseArgs.includes('-')) {
+                    args = baseArgs;
+                } else {
+                    args = [...baseArgs, fullPrompt];
+                    useStdin = false;
+                }
+            }
         } else {
             args = ['--print', '--dangerously-skip-permissions'];
         }
@@ -114,8 +135,10 @@ ${projectContext}
             stdio: ['pipe', 'pipe', 'pipe'],
         });
 
-        proc.stdin?.write(fullPrompt);
-        proc.stdin?.end();
+        if (useStdin) {
+            proc.stdin?.write(fullPrompt);
+            proc.stdin?.end();
+        }
 
         proc.stdout?.on('data', (data: Buffer) => {
             output += data.toString('utf-8');

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
   ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
   agent_id TEXT NOT NULL REFERENCES members(id),
-  provider TEXT NOT NULL CHECK(provider IN ('claude', 'opencode')),
+  provider TEXT NOT NULL CHECK(provider IN ('claude', 'opencode', 'codex')),
   prompt TEXT,
   feedback TEXT,
   status TEXT DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),

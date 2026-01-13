@@ -120,7 +120,7 @@ export function TicketSidebar({
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const savedProvider = window.localStorage.getItem('agentProvider') as AgentProvider | null;
-        if (savedProvider === 'claude' || savedProvider === 'opencode') {
+        if (savedProvider === 'claude' || savedProvider === 'opencode' || savedProvider === 'codex') {
             setProvider(savedProvider);
         }
     }, []);
@@ -506,7 +506,17 @@ export function TicketSidebar({
                                             : 'bg-tertiary text-tertiary hover:text-primary'
                                             } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
-                                        🟣 Claude
+                                        🟠 Claude
+                                    </button>
+                                    <button
+                                        onClick={() => setProvider('codex')}
+                                        disabled={executing}
+                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${provider === 'codex'
+                                            ? 'bg-orange-500 text-white'
+                                            : 'bg-tertiary text-tertiary hover:text-primary'
+                                            } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        🔵 Codex
                                     </button>
                                     <button
                                         onClick={() => setProvider('opencode')}
@@ -516,7 +526,7 @@ export function TicketSidebar({
                                             : 'bg-tertiary text-tertiary hover:text-primary'
                                             } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
-                                        🟢 OpenCode
+                                        ⚪️ OpenCode
                                     </button>
                                 </div>
                             </div>

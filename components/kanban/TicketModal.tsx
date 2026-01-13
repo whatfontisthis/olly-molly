@@ -100,7 +100,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const savedProvider = window.localStorage.getItem('agentProvider') as AgentProvider | null;
-        if (savedProvider === 'claude' || savedProvider === 'opencode') {
+        if (savedProvider === 'claude' || savedProvider === 'opencode' || savedProvider === 'codex') {
             setProvider(savedProvider);
         }
     }, []);
@@ -252,6 +252,12 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
         return formatDuration(elapsed);
     };
 
+    const providerLabel = provider === 'opencode'
+        ? 'OpenCode'
+        : provider === 'codex'
+            ? 'Codex'
+            : 'Claude';
+
     return (
         <Modal
             isOpen={isOpen}
@@ -320,7 +326,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                     onClick={handleExecuteAgent}
                                     disabled={!hasActiveProject}
                                 >
-                                    {status === 'NEED_FIX' ? '🔁 피드백 반영 및 재시도' : `🚀 ${provider === 'opencode' ? 'OpenCode' : 'Claude'}로 작업 실행`}
+                                    {status === 'NEED_FIX' ? '🔁 피드백 반영 및 재시도' : `🚀 ${providerLabel}로 작업 실행`}
                                 </Button>
                             ) : (
                                 <Button
@@ -347,7 +353,18 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                         : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                                         } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    🟣 Claude
+                                    🟠 Claude
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setProvider('codex')}
+                                    disabled={executing}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${provider === 'codex'
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                                        } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    🔵 Codex
                                 </button>
                                 <button
                                     type="button"
@@ -358,7 +375,7 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
                                         : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                                         } ${executing ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    🟢 OpenCode
+                                    ⚪️ OpenCode
                                 </button>
                             </div>
                         </div>

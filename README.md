@@ -71,7 +71,7 @@ That's it. Open `http://localhost:1234` and start managing your AI team.
 ### Prerequisites
 
 - Node.js 18+
-- One of the following CLI tools: [OpenCode](https://github.com/sst/opencode) or [Claude CLI](https://github.com/anthropics/claude-code)
+- One of the following CLI tools: [Codex CLI](https://www.npmjs.com/package/@openai/codex), [OpenCode](https://github.com/sst/opencode), or [Claude CLI](https://github.com/anthropics/claude-code)
 
 ### Run with npx (Recommended)
 
@@ -97,12 +97,15 @@ npm run dev
 
 ### AI CLI Tools (Required for Agent Execution)
 
-To run AI agents, you need to install either OpenCode or Claude CLI:
+To run AI agents, you need to install Codex CLI, OpenCode, or Claude CLI:
 
 **macOS (via Homebrew):**
 ```bash
 # OpenCode
 brew install sst/tap/opencode
+
+# Codex CLI
+npm install -g @openai/codex
 
 # Claude CLI
 brew install anthropics/tap/claude-code
@@ -112,6 +115,9 @@ brew install anthropics/tap/claude-code
 ```bash
 # OpenCode (via npm)
 npm install -g opencode-ai
+
+# Codex CLI (via npm)
+npm install -g @openai/codex
 
 # Claude CLI (via npm)
 npm install -g @anthropic-ai/claude-code
@@ -182,7 +188,7 @@ olly-molly/
 - **UI**: React 19, Tailwind CSS 4
 - **Database**: SQLite (better-sqlite3)
 - **Drag & Drop**: dnd-kit
-- **AI**: OpenCode / Claude CLI
+- **AI**: Codex CLI / OpenCode / Claude CLI
 
 ## License
 

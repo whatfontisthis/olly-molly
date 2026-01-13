@@ -188,6 +188,146 @@ function runMigrations(db: DatabaseType) {
 When given a bug report, quickly identify the issue, implement a fix, and verify it works correctly.')
     `).run();
   }
+
+  const conversationsTable = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'conversations'
+  `).get() as { sql?: string } | undefined;
+
+  if (conversationsTable?.sql && !conversationsTable.sql.includes("'codex'")) {
+    console.log('Running migration: Updating conversations provider constraint to include codex');
+    try {
+      db.exec(`
+        BEGIN;
+        ALTER TABLE conversations RENAME TO conversations_old;
+        CREATE TABLE conversations (
+          id TEXT PRIMARY KEY,
+          ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+          agent_id TEXT NOT NULL REFERENCES members(id),
+          provider TEXT NOT NULL CHECK(provider IN ('claude', 'opencode', 'codex')),
+          prompt TEXT,
+          feedback TEXT,
+          status TEXT DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
+          git_commit_hash TEXT,
+          started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO conversations (id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at)
+        SELECT id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at
+        FROM conversations_old;
+        DROP TABLE conversations_old;
+        CREATE INDEX IF NOT EXISTS idx_conversations_ticket ON conversations(ticket_id);
+        COMMIT;
+      `);
+    } catch (error) {
+      const message = String(error);
+      const getTableSql = (name: string) => {
+        const row = db.prepare(`
+          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?
+        `).get(name) as { sql?: string } | undefined;
+        return row?.sql;
+      };
+
+      const conversationsSql = getTableSql('conversations');
+      if (conversationsSql?.includes("'codex'")) {
+        console.log('Migration: conversations provider already updated, skipping');
+        return;
+      }
+
+      const hasConversationsOld = Boolean(getTableSql('conversations_old'));
+
+      try {
+        if (hasConversationsOld && !conversationsSql) {
+          db.exec(`
+            BEGIN;
+            CREATE TABLE IF NOT EXISTS conversations (
+              id TEXT PRIMARY KEY,
+              ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+              agent_id TEXT NOT NULL REFERENCES members(id),
+              provider TEXT NOT NULL CHECK(provider IN ('claude', 'opencode', 'codex')),
+              prompt TEXT,
+              feedback TEXT,
+              status TEXT DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
+              git_commit_hash TEXT,
+              started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              completed_at DATETIME,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO conversations (id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at)
+            SELECT id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at
+            FROM conversations_old;
+            DROP TABLE conversations_old;
+            CREATE INDEX IF NOT EXISTS idx_conversations_ticket ON conversations(ticket_id);
+            COMMIT;
+          `);
+          console.log('Migration: recovered conversations table from conversations_old');
+          return;
+        }
+
+        if (conversationsSql && !conversationsSql.includes("'codex'")) {
+          db.exec(`
+            BEGIN;
+            DROP TABLE IF EXISTS conversations_new;
+            CREATE TABLE conversations_new (
+              id TEXT PRIMARY KEY,
+              ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+              agent_id TEXT NOT NULL REFERENCES members(id),
+              provider TEXT NOT NULL CHECK(provider IN ('claude', 'opencode', 'codex')),
+              prompt TEXT,
+              feedback TEXT,
+              status TEXT DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
+              git_commit_hash TEXT,
+              started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              completed_at DATETIME,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO conversations_new (id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at)
+            SELECT id, ticket_id, agent_id, provider, prompt, feedback, status, git_commit_hash, started_at, completed_at, created_at
+            FROM conversations;
+            DROP TABLE conversations;
+            ALTER TABLE conversations_new RENAME TO conversations;
+            CREATE INDEX IF NOT EXISTS idx_conversations_ticket ON conversations(ticket_id);
+            COMMIT;
+          `);
+          console.log('Migration: updated conversations provider constraint with fallback');
+          return;
+        }
+      } catch (fallbackError) {
+        console.warn(`Migration: fallback failed for conversations provider constraint: ${fallbackError}`);
+      }
+
+      console.warn(`Migration: failed to update conversations provider constraint: ${message}`);
+    }
+  }
+
+  const conversationMessagesTable = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'conversation_messages'
+  `).get() as { sql?: string } | undefined;
+
+  if (conversationMessagesTable?.sql?.includes('"conversations_old"')) {
+    console.log('Running migration: Fixing conversation_messages foreign key reference');
+    try {
+      db.exec(`
+        BEGIN;
+        ALTER TABLE conversation_messages RENAME TO conversation_messages_old;
+        CREATE TABLE conversation_messages (
+          id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          message_type TEXT DEFAULT 'log' CHECK(message_type IN ('log', 'error', 'success', 'system')),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO conversation_messages (id, conversation_id, content, message_type, created_at)
+        SELECT id, conversation_id, content, message_type, created_at
+        FROM conversation_messages_old;
+        DROP TABLE conversation_messages_old;
+        CREATE INDEX IF NOT EXISTS idx_conversation_messages_conversation ON conversation_messages(conversation_id);
+        COMMIT;
+      `);
+    } catch (error) {
+      console.warn(`Migration: failed to fix conversation_messages foreign key: ${error}`);
+    }
+  }
 }
 
 // Types
@@ -260,7 +400,7 @@ export interface Conversation {
   id: string;
   ticket_id: string;
   agent_id: string;
-  provider: 'claude' | 'opencode';
+  provider: 'claude' | 'opencode' | 'codex';
   prompt: string | null;
   feedback: string | null;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -651,7 +791,7 @@ export const conversationService = {
   create(data: {
     ticket_id: string;
     agent_id: string;
-    provider: 'claude' | 'opencode';
+    provider: 'claude' | 'opencode' | 'codex';
     prompt?: string;
     feedback?: string;
   }): Conversation {

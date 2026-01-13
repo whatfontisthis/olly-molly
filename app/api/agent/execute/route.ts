@@ -138,11 +138,17 @@ export async function POST(request: NextRequest) {
         });
 
         // Log activity
+        const providerLabel = provider === 'opencode'
+            ? 'OpenCode'
+            : provider === 'codex'
+                ? 'Codex CLI'
+                : 'Claude Code';
+
         activityService.log({
             ticket_id: body.ticket_id,
             member_id: agent.id,
             action: 'AGENT_WORK_STARTED',
-            details: `${agent.name} started working on this task using ${provider === 'opencode' ? 'OpenCode' : 'Claude Code'}`,
+            details: `${agent.name} started working on this task using ${providerLabel}`,
         });
 
         // Start background job (non-blocking)

@@ -5,7 +5,7 @@ import { spawn } from 'child_process';
 /**
  * PM Agent - CLI-powered feature breakdown
  * 
- * Uses opencode or claude CLI to analyze feature requests and create appropriate tasks
+ * Uses codex, opencode, or claude CLI to analyze feature requests and create appropriate tasks
  * with intelligent assignment to team members.
  */
 
@@ -51,7 +51,7 @@ CRITICAL: You MUST respond with ONLY a valid JSON object, no other text. The for
 }`;
 
 // Detect available CLI tool
-async function detectCLI(): Promise<'claude' | 'opencode' | null> {
+async function detectCLI(): Promise<'claude' | 'opencode' | 'codex' | null> {
     const isWindows = process.platform === 'win32';
     const whichCmd = isWindows ? 'where' : 'which';
 
@@ -63,6 +63,7 @@ async function detectCLI(): Promise<'claude' | 'opencode' | null> {
         });
     };
 
+    if (await checkCommand('codex')) return 'codex';
     if (await checkCommand('claude')) return 'claude';
     if (await checkCommand('opencode')) return 'opencode';
     return null;
@@ -72,7 +73,7 @@ async function breakdownWithCLI(request: string, projectPath: string): Promise<{
     const cli = await detectCLI();
 
     if (!cli) {
-        throw new Error('No CLI tool available. Please install either claude or opencode.');
+        throw new Error('No CLI tool available. Please install codex, claude, or opencode.');
     }
 
     const fullPrompt = `${SYSTEM_PROMPT}
@@ -84,9 +85,29 @@ Feature Request: ${request}`;
         let errorOutput = '';
 
         let args: string[];
+        let useStdin = true;
         if (cli === 'opencode') {
             // opencode uses 'run' with stdin
             args = ['run', '-'];
+        } else if (cli === 'codex') {
+            const rawArgs = process.env.CODEX_CLI_ARGS;
+            const parsed = rawArgs ? rawArgs.split(' ').map(arg => arg.trim()).filter(Boolean) : [];
+            if (parsed.length === 0) {
+                args = ['exec', '--dangerously-bypass-approvals-and-sandbox', '-'];
+                useStdin = true;
+            } else {
+                const hasExec = parsed.includes('exec');
+                const baseArgs = hasExec ? parsed : ['exec', ...parsed];
+                if (baseArgs.includes('{prompt}')) {
+                    args = baseArgs.map(arg => (arg === '{prompt}' ? fullPrompt : arg));
+                    useStdin = false;
+                } else if (baseArgs.includes('-')) {
+                    args = baseArgs;
+                } else {
+                    args = [...baseArgs, fullPrompt];
+                    useStdin = false;
+                }
+            }
         } else {
             // claude reads from stdin when no prompt is provided with --print
             args = ['--print', '--dangerously-skip-permissions'];
@@ -102,9 +123,11 @@ Feature Request: ${request}`;
             stdio: ['pipe', 'pipe', 'pipe'],
         });
 
-        // Write prompt to stdin
-        proc.stdin?.write(fullPrompt);
-        proc.stdin?.end();
+        if (useStdin) {
+            // Write prompt to stdin
+            proc.stdin?.write(fullPrompt);
+            proc.stdin?.end();
+        }
 
         proc.stdout?.on('data', (data: Buffer) => {
             output += data.toString('utf-8');

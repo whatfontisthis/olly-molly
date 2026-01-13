@@ -96,6 +96,12 @@ export function ConversationView({ conversation, messages, isRunning = false, jo
         return new Date(normalized);
     };
 
+    const getProviderLabel = (provider: Conversation['provider']) => {
+        if (provider === 'opencode') return '⚪️ OpenCode';
+        if (provider === 'codex') return '🔵 Codex';
+        return '🟠 Claude';
+    };
+
     const formatDuration = (start: Date, end: Date) => {
         const durationMs = Math.max(0, end.getTime() - start.getTime());
         const totalSeconds = Math.floor(durationMs / 1000);
@@ -117,7 +123,7 @@ export function ConversationView({ conversation, messages, isRunning = false, jo
                     <div>
                         <h3 className="font-medium text-primary">{conversation.agent?.name || 'Agent'}</h3>
                         <p className="text-xs text-muted">
-                            {conversation.provider === 'opencode' ? '🟢 OpenCode' : '🟣 Claude'}
+                            {getProviderLabel(conversation.provider)}
                         </p>
                     </div>
                 </div>

@@ -17,15 +17,17 @@ async function checkCommandExists(command: string): Promise<boolean> {
 
 export async function GET() {
     try {
-        const [hasOpencode, hasClaude] = await Promise.all([
+        const [hasOpencode, hasClaude, hasCodex] = await Promise.all([
             checkCommandExists('opencode'),
             checkCommandExists('claude'),
+            checkCommandExists('codex'),
         ]);
 
         return NextResponse.json({
             opencode: hasOpencode,
             claude: hasClaude,
-            anyInstalled: hasOpencode || hasClaude,
+            codex: hasCodex,
+            anyInstalled: hasOpencode || hasClaude || hasCodex,
         });
     } catch (error) {
         console.error('Error checking CLI:', error);

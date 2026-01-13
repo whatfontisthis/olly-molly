@@ -33,7 +33,9 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
     };
 
     const getProviderBadge = (provider: Conversation['provider']) => {
-        return provider === 'opencode' ? '🟢 OpenCode' : '🟣 Claude';
+        if (provider === 'opencode') return '⚪️ OpenCode';
+        if (provider === 'codex') return '🔵 Codex';
+        return '🟠 Claude';
     };
 
     const formatTime = (dateString: string) => {
