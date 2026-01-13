@@ -37,19 +37,169 @@ const runningDevServers = new Map<string, {
 }>();
 
 /**
- * Detect externally running dev server for a project
+ * Detect externally running dev server for a project (Windows)
+ * Uses wmic/tasklist to find node processes and netstat to check ports
+ */
+function detectExternalDevServerWindows(targetPath: string): { running: boolean; port?: number; pid?: number } {
+    try {
+        // Normalize the target path for Windows comparison
+        const normalizedTarget = targetPath.replace(/\//g, '\\').toLowerCase();
+
+        // Step 1: Find node.exe processes listening on ports using netstat
+        // netstat -ano outputs lines like:
+        // TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       12345
+        let netstatResult: string;
+        try {
+            netstatResult = execSync('netstat -ano | findstr LISTENING | findstr /I node', {
+                encoding: 'utf-8',
+                timeout: 10000,
+                shell: 'cmd.exe',
+            });
+        } catch {
+            // findstr returns error if no match, try without node filter
+            try {
+                netstatResult = execSync('netstat -ano | findstr LISTENING', {
+                    encoding: 'utf-8',
+                    timeout: 10000,
+                    shell: 'cmd.exe',
+                });
+            } catch {
+                return { running: false };
+            }
+        }
+
+        if (!netstatResult.trim()) return { running: false };
+
+        // Collect PIDs and their listening ports from netstat
+        const pidPortMap = new Map<number, number[]>();
+        const lines = netstatResult.trim().split('\n');
+        for (const line of lines) {
+            // Parse: TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       12345
+            const match = line.match(/TCP\s+[\d.:]+:(\d+)\s+.*LISTENING\s+(\d+)/i);
+            if (match) {
+                const port = parseInt(match[1], 10);
+                const pid = parseInt(match[2], 10);
+                if (!isNaN(port) && !isNaN(pid) && pid > 0) {
+                    if (!pidPortMap.has(pid)) {
+                        pidPortMap.set(pid, []);
+                    }
+                    pidPortMap.get(pid)!.push(port);
+                }
+            }
+        }
+
+        if (pidPortMap.size === 0) return { running: false };
+
+        // Step 2: Check each listening PID to see if it's a node process in our target directory
+        // Use wmic to get process info including command line
+        for (const [pid, ports] of pidPortMap) {
+            try {
+                // Get process details using wmic
+                const wmicResult = execSync(
+                    `wmic process where "ProcessId=${pid}" get Name,ExecutablePath,CommandLine /format:list`,
+                    {
+                        encoding: 'utf-8',
+                        timeout: 5000,
+                        shell: 'cmd.exe',
+                    }
+                );
+
+                const wmicLower = wmicResult.toLowerCase();
+                
+                // Check if it's a node process
+                if (!wmicLower.includes('node.exe')) {
+                    continue;
+                }
+
+                // Check if the command line or executable path contains our target path
+                if (wmicLower.includes(normalizedTarget)) {
+                    // Found a node process in our target directory
+                    // Return the first common dev server port (3000-3999, 4000-4999, 5000-5999, 8000-8999)
+                    const devPort = ports.find(p => 
+                        (p >= 3000 && p < 4000) || 
+                        (p >= 4000 && p < 5000) || 
+                        (p >= 5000 && p < 6000) || 
+                        (p >= 8000 && p < 9000)
+                    ) || ports[0];
+                    
+                    return { running: true, port: devPort, pid };
+                }
+
+                // Alternative: Check if cwd matches using PowerShell (more reliable but slower)
+                try {
+                    const psResult = execSync(
+                        `powershell -Command "(Get-Process -Id ${pid}).Path"`,
+                        {
+                            encoding: 'utf-8',
+                            timeout: 3000,
+                            shell: 'cmd.exe',
+                        }
+                    ).trim().toLowerCase();
+                    
+                    if (psResult.includes('node') && wmicLower.includes(normalizedTarget)) {
+                        const devPort = ports.find(p => 
+                            (p >= 3000 && p < 4000) || 
+                            (p >= 4000 && p < 5000) || 
+                            (p >= 5000 && p < 6000) || 
+                            (p >= 8000 && p < 9000)
+                        ) || ports[0];
+                        
+                        return { running: true, port: devPort, pid };
+                    }
+                } catch {
+                    // PowerShell check failed, continue
+                }
+            } catch {
+                // This PID check failed, try next
+                continue;
+            }
+        }
+
+        // Fallback: Check if any node process is listening on common dev ports
+        // and the project path has a running dev server by checking port accessibility
+        const commonDevPorts = [3000, 3001, 3002, 4000, 5000, 5173, 8000, 8080];
+        for (const port of commonDevPorts) {
+            const pids = Array.from(pidPortMap.entries())
+                .filter(([_, ports]) => ports.includes(port))
+                .map(([pid, _]) => pid);
+            
+            for (const pid of pids) {
+                try {
+                    const wmicResult = execSync(
+                        `wmic process where "ProcessId=${pid}" get Name /format:list`,
+                        {
+                            encoding: 'utf-8',
+                            timeout: 3000,
+                            shell: 'cmd.exe',
+                        }
+                    );
+                    
+                    if (wmicResult.toLowerCase().includes('node.exe')) {
+                        // Found a node process on a common dev port
+                        // We can't definitively confirm it's for our project without cwd check
+                        // but this is a reasonable fallback
+                        return { running: true, port, pid };
+                    }
+                } catch {
+                    continue;
+                }
+            }
+        }
+
+        return { running: false };
+    } catch (error) {
+        console.error('Error detecting external dev server (Windows):', error);
+        return { running: false };
+    }
+}
+
+/**
+ * Detect externally running dev server for a project (macOS/Linux)
  * Uses lsof to find node processes with cwd matching the project path
  * and then checks which port they are listening on
  */
-function detectExternalDevServer(targetPath: string): { running: boolean; port?: number; pid?: number } {
+function detectExternalDevServerUnix(targetPath: string): { running: boolean; port?: number; pid?: number } {
     try {
-        const isWindows = process.platform === 'win32';
-
-        if (isWindows) {
-            // Windows detection is more complex, skip for now
-            return { running: false };
-        }
-
         // Step 1: Find node processes with cwd matching target path
         // lsof -c node -a -d cwd outputs lines like:
         // node    95847 user  cwd    DIR   1,13  544 96780203 /path/to/project
@@ -112,6 +262,20 @@ function detectExternalDevServer(targetPath: string): { running: boolean; port?:
     } catch (error) {
         console.error('Error detecting external dev server:', error);
         return { running: false };
+    }
+}
+
+/**
+ * Detect externally running dev server for a project
+ * Cross-platform: uses different methods for Windows vs Unix-like systems
+ */
+function detectExternalDevServer(targetPath: string): { running: boolean; port?: number; pid?: number } {
+    const isWindows = process.platform === 'win32';
+    
+    if (isWindows) {
+        return detectExternalDevServerWindows(targetPath);
+    } else {
+        return detectExternalDevServerUnix(targetPath);
     }
 }
 
