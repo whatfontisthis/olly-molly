@@ -420,6 +420,7 @@ export function startBackgroundJob(params: StartJobParams): void {
     let streamedTextBuffer = '';
     let lastFlushTime = Date.now();
     let hasStreamedText = false;
+    let claudeResultReceived = false; // Track if we received a result from Claude
 
     const flushStreamedText = (force = false) => {
         if (!streamedTextBuffer) return;
@@ -448,10 +449,13 @@ export function startBackgroundJob(params: StartJobParams): void {
                 return;
             }
 
-            if (parsed?.type === 'result' && typeof parsed.result === 'string' && !hasStreamedText) {
-                streamedTextBuffer += parsed.result;
-                hasStreamedText = true;
-                flushStreamedText(true);
+            if (parsed?.type === 'result') {
+                claudeResultReceived = true; // Claude finished and sent result
+                if (typeof parsed.result === 'string' && !hasStreamedText) {
+                    streamedTextBuffer += parsed.result;
+                    hasStreamedText = true;
+                    flushStreamedText(true);
+                }
             }
         } catch {
             streamedTextBuffer += `${line}\n`;
@@ -497,7 +501,7 @@ export function startBackgroundJob(params: StartJobParams): void {
         }
 
         // Log exit code for debugging
-        console.log(`[agent-jobs] Process exited with code: ${code}`);
+        console.log(`[agent-jobs] Process exited with code: ${code}, provider: ${provider}, claudeResultReceived: ${isClaudeStream ? claudeResultReceived : 'N/A'}`);
 
         // Extract commit hash from output
         const commitMatch = job.output.match(/commit\s+([a-f0-9]{7,40})/i);
@@ -507,17 +511,46 @@ export function startBackgroundJob(params: StartJobParams): void {
         // 1. Exit code 0 (normal success)
         // 2. Has a commit hash (work was committed)
         // 3. Output contains success indicators
+        // 4. For Claude: received a result message (claude sends result even with non-zero exit)
         const hasSuccessIndicators = 
             job.output.includes('commit') ||
             job.output.includes('committed') ||
             job.output.includes('completed') ||
             job.output.includes('successfully') ||
-            job.output.includes('✅');
+            job.output.includes('Created') ||
+            job.output.includes('Modified') ||
+            job.output.includes('Updated') ||
+            job.output.includes('Implemented') ||
+            job.output.includes('Fixed') ||
+            job.output.includes('✅') ||
+            /files?\s+(created|modified|updated|changed)/i.test(job.output);
 
-        const success = code === 0 || commitHash !== undefined || (code === null && hasSuccessIndicators);
+        // Check for explicit failure indicators
+        const hasFailureIndicators = 
+            job.output.includes('Error:') ||
+            job.output.includes('fatal:') ||
+            job.output.includes('FAILED') ||
+            job.output.includes('❌ Task failed') ||
+            /error\s*occurred/i.test(job.output);
+
+        // For Claude with stream-json, success if:
+        // - Exit code 0, OR
+        // - We received a result message and no explicit failure, OR
+        // - We have success indicators and no failure indicators
+        const claudeSuccess = isClaudeStream && (
+            claudeResultReceived && !hasFailureIndicators ||
+            hasStreamedText && hasSuccessIndicators && !hasFailureIndicators
+        );
+
+        const success = code === 0 || 
+            commitHash !== undefined || 
+            claudeSuccess ||
+            (code === null && hasSuccessIndicators && !hasFailureIndicators) ||
+            (hasSuccessIndicators && !hasFailureIndicators && job.output.length > 500);
+            
         job.status = success ? 'completed' : 'failed';
 
-        console.log(`[agent-jobs] Task marked as: ${job.status} (code: ${code}, commitHash: ${commitHash}, hasIndicators: ${hasSuccessIndicators})`);
+        console.log(`[agent-jobs] Task marked as: ${job.status} (code: ${code}, commitHash: ${commitHash}, successIndicators: ${hasSuccessIndicators}, failureIndicators: ${hasFailureIndicators}, claudeSuccess: ${claudeSuccess})`);
 
         // Update conversation status
         conversationService.complete(conversationId, {
