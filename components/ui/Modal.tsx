@@ -56,7 +56,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
                 bg-[var(--bg-card)] 
                 border border-[var(--border-primary)]
                 animate-in zoom-in-95
-                ${size === 'full' ? 'max-h-none' : 'max-h-[calc(100vh-4rem)]'} overflow-y-auto
+                flex flex-col
+                ${size === 'full' ? 'max-h-none overflow-hidden' : 'max-h-[calc(100vh-4rem)] overflow-y-auto'}
             `}>
                 {title && (
                     <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
@@ -71,7 +72,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
                         </button>
                     </div>
                 )}
-                <div className={size === 'full' ? 'p-0' : 'p-6'}>{children}</div>
+                <div className={size === 'full' ? 'p-0 flex-1 min-h-0' : 'p-6'}>{children}</div>
             </div>
         </div>
     );
