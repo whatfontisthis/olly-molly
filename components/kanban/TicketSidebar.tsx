@@ -231,15 +231,19 @@ export function TicketSidebar({
         };
     }, [selectedConversationId, ticket?.id, onTicketUpdate]);
 
-    const handleSave = () => {
+    const persistTicketDetails = async () => {
         if (!ticket) return;
-        onTicketUpdate(ticket.id, {
+        await onTicketUpdate(ticket.id, {
             title,
             description: description || null,
             status,
             priority,
             assignee_id: assigneeId || null,
         });
+    };
+
+    const handleSave = () => {
+        void persistTicketDetails();
     };
 
     const handleDelete = () => {
@@ -256,6 +260,7 @@ export function TicketSidebar({
         setExecuting(true);
 
         try {
+            await persistTicketDetails();
             const res = await fetch('/api/agent/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
