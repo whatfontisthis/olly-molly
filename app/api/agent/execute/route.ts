@@ -80,7 +80,7 @@ INSTRUCTIONS:
 3. Focus only on what's needed for this specific task
 4. Write clean, well-documented code
 5. After completing, provide a brief summary of changes made
-6. If you make changes, commit them with a meaningful message
+6. COMMIT REQUIREMENT (MANDATORY): If you made any code or file changes, you MUST create a git commit before finishing. Do not skip this step unless there are truly no changes to commit.
 7. CRITICAL: You are working on the external project "${project.name}". When starting its server, ALWAYS use port 3001 (e.g. "PORT=3001 npm run dev"). NEVER use port 1234.${qaInstruction}${imageGenerationInstruction}${screenshotInstruction}
 
 Please complete this task now.`;
