@@ -167,7 +167,7 @@ export function PMRequestModal({ isOpen, onClose, onTicketsCreated, projectId }:
                                 <div>
                                     <p className="font-medium text-[var(--text-primary)]">PM Agent</p>
                                     <p className="text-sm text-[var(--text-tertiary)]">
-                                        어떤 기능을 만들고 싶으신가요? AI가 요청을 분석해서 적절한 태스크로 분해하고 팀원들에게 자동 할당해 드릴게요.
+                                        어떤 기능을 만들고 싶으신가요? 기술적으로 자세히 쓰지 않아도 되고, AI가 간단한 태스크로 나눠 팀원에게 할당해 드릴게요.
                                     </p>
                                 </div>
                             </div>
@@ -176,7 +176,7 @@ export function PMRequestModal({ isOpen, onClose, onTicketsCreated, projectId }:
                                 label="기능 요청"
                                 value={request}
                                 onChange={(e) => setRequest(e.target.value)}
-                                placeholder="예: 사용자 로그인 기능을 만들어줘. 이메일과 비밀번호로 로그인하고, 로그인 성공하면 대시보드로 이동해야 해."
+                                placeholder="예: 사용자 로그인 기능을 만들어줘. 이메일/비밀번호로 로그인하고 성공하면 대시보드로 이동."
                                 rows={4}
                             />
 
