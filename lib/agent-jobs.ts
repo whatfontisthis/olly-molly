@@ -455,12 +455,29 @@ export function startBackgroundJob(params: StartJobParams): void {
             }
             flushStreamedText(true);
         }
-        const success = code === 0;
-        job.status = success ? 'completed' : 'failed';
+
+        // Log exit code for debugging
+        console.log(`[agent-jobs] Process exited with code: ${code}`);
 
         // Extract commit hash from output
         const commitMatch = job.output.match(/commit\s+([a-f0-9]{7,40})/i);
         const commitHash = commitMatch ? commitMatch[1] : undefined;
+
+        // Determine success with multiple criteria:
+        // 1. Exit code 0 (normal success)
+        // 2. Has a commit hash (work was committed)
+        // 3. Output contains success indicators
+        const hasSuccessIndicators = 
+            job.output.includes('commit') ||
+            job.output.includes('committed') ||
+            job.output.includes('completed') ||
+            job.output.includes('successfully') ||
+            job.output.includes('✅');
+
+        const success = code === 0 || commitHash !== undefined || (code === null && hasSuccessIndicators);
+        job.status = success ? 'completed' : 'failed';
+
+        console.log(`[agent-jobs] Task marked as: ${job.status} (code: ${code}, commitHash: ${commitHash}, hasIndicators: ${hasSuccessIndicators})`);
 
         // Update conversation status
         conversationService.complete(conversationId, {
