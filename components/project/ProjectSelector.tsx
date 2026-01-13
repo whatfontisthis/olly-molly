@@ -38,6 +38,20 @@ export function ProjectSelector({ onProjectChange }: ProjectSelectorProps) {
     const [createError, setCreateError] = useState<string | null>(null);
     const [createProgress, setCreateProgress] = useState<string | null>(null);
 
+    const storageKey = 'olly-active-project-id';
+    const getStoredProjectId = () => {
+        if (typeof window === 'undefined') return null;
+        return sessionStorage.getItem(storageKey);
+    };
+    const persistProjectId = (id: string | null) => {
+        if (typeof window === 'undefined') return;
+        if (id) {
+            sessionStorage.setItem(storageKey, id);
+        } else {
+            sessionStorage.removeItem(storageKey);
+        }
+    };
+
     useEffect(() => {
         fetchProjects();
     }, []);
@@ -47,9 +61,17 @@ export function ProjectSelector({ onProjectChange }: ProjectSelectorProps) {
             const res = await fetch('/api/projects');
             const data = await res.json();
             setProjects(data);
-            const active = data.find((p: Project) => p.is_active);
-            setActiveProject(active || null);
-            onProjectChange?.(active || null);
+            const storedId = getStoredProjectId();
+            const storedProject = storedId ? data.find((p: Project) => p.id === storedId) : null;
+            const active = storedProject || data.find((p: Project) => p.is_active) || null;
+            if (storedId && !storedProject) {
+                persistProjectId(null);
+            }
+            if (active?.id && active.id !== storedId) {
+                persistProjectId(active.id);
+            }
+            setActiveProject(active);
+            onProjectChange?.(active);
         } catch (err) {
             console.error('Failed to fetch projects:', err);
         }
@@ -142,6 +164,7 @@ export function ProjectSelector({ onProjectChange }: ProjectSelectorProps) {
             });
 
             if (res.ok) {
+                persistProjectId(id);
                 await fetchProjects();
             }
         } catch (err) {
