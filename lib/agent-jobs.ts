@@ -7,6 +7,15 @@ export type AgentProvider = 'claude' | 'opencode';
 
 const CLAUDE_CMD = 'claude';
 const OPENCODE_CMD = 'opencode';
+const CLAUDE_STREAM_ARGS = [
+    '--print',
+    '--dangerously-skip-permissions',
+    '--output-format=stream-json',
+    '--include-partial-messages',
+    '--verbose',
+];
+const STREAM_FLUSH_INTERVAL_MS = 1000;
+const STREAM_FLUSH_CHARS = 200;
 
 interface RunningJob {
     id: string;
@@ -304,6 +313,7 @@ export function startBackgroundJob(params: StartJobParams): void {
     let execPath: string;
     let args: string[];
     let startMessage: string;
+    const isClaudeStream = provider === 'claude';
 
     if (provider === 'opencode') {
         execPath = OPENCODE_CMD;
@@ -313,7 +323,7 @@ export function startBackgroundJob(params: StartJobParams): void {
     } else {
         execPath = CLAUDE_CMD;
         // Use stdin for prompt to avoid shell escaping issues
-        args = ['--print', '--dangerously-skip-permissions'];
+        args = CLAUDE_STREAM_ARGS;
         startMessage = `🚀 Starting Claude Code in ${projectPath}...\n\n`;
     }
 
@@ -351,9 +361,63 @@ export function startBackgroundJob(params: StartJobParams): void {
     // Log start message to conversation
     conversationMessageService.create(conversationId, startMessage, 'system');
 
+    let stdoutBuffer = '';
+    let streamedTextBuffer = '';
+    let lastFlushTime = Date.now();
+    let hasStreamedText = false;
+
+    const flushStreamedText = (force = false) => {
+        if (!streamedTextBuffer) return;
+        const now = Date.now();
+        if (!force && now - lastFlushTime < STREAM_FLUSH_INTERVAL_MS && streamedTextBuffer.length < STREAM_FLUSH_CHARS) {
+            return;
+        }
+        const chunk = streamedTextBuffer;
+        streamedTextBuffer = '';
+        lastFlushTime = now;
+        job.output += chunk;
+        conversationMessageService.create(conversationId, chunk, 'log');
+    };
+
+    const handleClaudeStreamLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed?.type === 'stream_event' &&
+                parsed.event?.type === 'content_block_delta' &&
+                parsed.event?.delta?.type === 'text_delta') {
+                streamedTextBuffer += parsed.event.delta.text;
+                hasStreamedText = true;
+                flushStreamedText();
+                return;
+            }
+
+            if (parsed?.type === 'result' && typeof parsed.result === 'string' && !hasStreamedText) {
+                streamedTextBuffer += parsed.result;
+                hasStreamedText = true;
+                flushStreamedText(true);
+            }
+        } catch {
+            streamedTextBuffer += `${line}\n`;
+            flushStreamedText();
+        }
+    };
+
     // Capture stdout
     agentProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString('utf-8');
+        if (isClaudeStream) {
+            stdoutBuffer += text;
+            const lines = stdoutBuffer.split('\n');
+            stdoutBuffer = lines.pop() || '';
+            for (const line of lines) {
+                handleClaudeStreamLine(line);
+            }
+            flushStreamedText();
+            return;
+        }
+
         job.output += text;
         // Save to conversation messages
         conversationMessageService.create(conversationId, text, 'log');
@@ -369,6 +433,13 @@ export function startBackgroundJob(params: StartJobParams): void {
     });
 
     agentProcess.on('close', (code: number | null) => {
+        if (isClaudeStream) {
+            if (stdoutBuffer.trim()) {
+                handleClaudeStreamLine(stdoutBuffer);
+                stdoutBuffer = '';
+            }
+            flushStreamedText(true);
+        }
         const success = code === 0;
         job.status = success ? 'completed' : 'failed';
 
