@@ -272,13 +272,13 @@ export default function Dashboard() {
             >
               파일 탐색
             </Button>
-            <Button
+            {/* <Button
               variant="ghost"
               size="sm"
               onClick={() => setPmModalOpen(true)}
             >
               PM 요청
-            </Button>
+            </Button> */}
             <Button
               variant="primary"
               size="sm"
