@@ -116,6 +116,19 @@ export function TicketSidebar({
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const savedProvider = window.localStorage.getItem('agentProvider') as AgentProvider | null;
+        if (savedProvider === 'claude' || savedProvider === 'opencode') {
+            setProvider(savedProvider);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem('agentProvider', provider);
+    }, [provider]);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Update form fields when ticket changes

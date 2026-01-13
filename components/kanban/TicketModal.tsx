@@ -96,6 +96,19 @@ export function TicketModal({ isOpen, onClose, ticket, members, onSave, onDelete
     const [feedback, setFeedback] = useState('');
     const [provider, setProvider] = useState<AgentProvider>('opencode');
     const [expandedLog, setExpandedLog] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const savedProvider = window.localStorage.getItem('agentProvider') as AgentProvider | null;
+        if (savedProvider === 'claude' || savedProvider === 'opencode') {
+            setProvider(savedProvider);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem('agentProvider', provider);
+    }, [provider]);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const outputRef = useRef<HTMLPreElement>(null);
 
