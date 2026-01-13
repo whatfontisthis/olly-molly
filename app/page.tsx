@@ -304,8 +304,8 @@ export default function Dashboard() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round"
                   d={sidebarOpen
-                    ? "M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                    : "M13 5l7 7-7 7M5 5l7 7-7 7"} />
+                    ? "M13 5l7 7-7 7M5 5l7 7-7 7"
+                    : "M11 19l-7-7 7-7m8 14l-7-7 7-7"} />
               </svg>
             </button>
           </div>
