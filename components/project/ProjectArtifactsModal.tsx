@@ -48,6 +48,34 @@ interface SiteEntry {
     path: string;
 }
 
+interface GitStatus {
+    head: string;
+    branch: string | null;
+    upstream: string | null;
+    ahead: number;
+    behind: number;
+    isDirty: boolean;
+    isDetached: boolean;
+}
+
+interface GitCommit {
+    hash: string;
+    shortHash: string;
+    parents: string[];
+    author: string;
+    date: string;
+    relativeDate: string;
+    subject: string;
+    refs: string[];
+}
+
+interface GitResponse {
+    isGitRepo: boolean;
+    graphRef?: string;
+    status?: GitStatus;
+    commits?: GitCommit[];
+}
+
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
 const MARKDOWN_EXTENSIONS = new Set(['md', 'mdx']);
 const CODE_EXTENSIONS = new Set([
@@ -135,7 +163,7 @@ export function ProjectArtifactsModal({
     projectName,
     projectPath,
 }: ProjectArtifactsModalProps) {
-    const [activeTab, setActiveTab] = useState<'files' | 'sites'>('files');
+    const [activeTab, setActiveTab] = useState<'files' | 'sites' | 'git'>('files');
     const [previewOnly, setPreviewOnly] = useState(false);
     const [currentPath, setCurrentPath] = useState('');
     const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -146,6 +174,13 @@ export function ProjectArtifactsModal({
     const [sites, setSites] = useState<SiteEntry[]>([]);
     const [sitesLoading, setSitesLoading] = useState(false);
     const [sitesError, setSitesError] = useState<string | null>(null);
+    const [gitData, setGitData] = useState<GitResponse | null>(null);
+    const [gitLoading, setGitLoading] = useState(false);
+    const [gitError, setGitError] = useState<string | null>(null);
+    const [gitCheckoutTarget, setGitCheckoutTarget] = useState<string | null>(null);
+    const [gitActionLoading, setGitActionLoading] = useState<string | null>(null);
+    const [gitCommitMessage, setGitCommitMessage] = useState('');
+    const [gitStashMessage, setGitStashMessage] = useState('');
 
     const breadcrumbs = useMemo(() => {
         if (!currentPath) {
@@ -209,6 +244,12 @@ export function ProjectArtifactsModal({
         setSelectedFile(null);
         setSites([]);
         setSitesError(null);
+        setGitData(null);
+        setGitError(null);
+        setGitCheckoutTarget(null);
+        setGitActionLoading(null);
+        setGitCommitMessage('');
+        setGitStashMessage('');
         if (projectId) {
             loadDirectory('');
         }
@@ -232,12 +273,37 @@ export function ProjectArtifactsModal({
         }
     }, [projectId]);
 
+    const loadGit = useCallback(async () => {
+        if (!projectId) return;
+        setGitLoading(true);
+        setGitError(null);
+        try {
+            const res = await fetch(`/api/projects/git?projectId=${projectId}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to load git history');
+            }
+            setGitData(data);
+        } catch (err) {
+            setGitError(err instanceof Error ? err.message : 'Failed to load git history');
+        } finally {
+            setGitLoading(false);
+        }
+    }, [projectId]);
+
     useEffect(() => {
         if (!isOpen || activeTab !== 'sites') return;
         if (projectId) {
             loadSites();
         }
     }, [activeTab, isOpen, projectId, loadSites]);
+
+    useEffect(() => {
+        if (!isOpen || activeTab !== 'git') return;
+        if (projectId) {
+            loadGit();
+        }
+    }, [activeTab, isOpen, projectId, loadGit]);
 
     const handleEntryClick = (entry: FileEntry) => {
         if (entry.type === 'directory') {
@@ -255,6 +321,58 @@ export function ProjectArtifactsModal({
         loadFile(path);
     };
 
+    const handleGitCheckout = useCallback(async (target: string) => {
+        if (!projectId) return;
+        setGitCheckoutTarget(target);
+        setGitActionLoading('checkout');
+        setGitError(null);
+        try {
+            const res = await fetch('/api/projects/git', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, action: 'checkout', target }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to checkout commit');
+            }
+            await loadGit();
+        } catch (err) {
+            setGitError(err instanceof Error ? err.message : 'Failed to checkout commit');
+        } finally {
+            setGitCheckoutTarget(null);
+            setGitActionLoading(null);
+        }
+    }, [projectId, loadGit]);
+
+    const handleGitAction = useCallback(async (action: 'init' | 'stash' | 'commit', payload?: Record<string, string>) => {
+        if (!projectId) return;
+        setGitActionLoading(action);
+        setGitError(null);
+        try {
+            const res = await fetch('/api/projects/git', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, action, ...payload }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Git action failed');
+            }
+            if (action === 'commit') {
+                setGitCommitMessage('');
+            }
+            if (action === 'stash') {
+                setGitStashMessage('');
+            }
+            await loadGit();
+        } catch (err) {
+            setGitError(err instanceof Error ? err.message : 'Git action failed');
+        } finally {
+            setGitActionLoading(null);
+        }
+    }, [projectId, loadGit]);
+
     const selectedExtension = selectedFile?.entry.extension || '';
     const isMarkdown = MARKDOWN_EXTENSIONS.has(selectedExtension);
     const isImage = IMAGE_EXTENSIONS.has(selectedExtension);
@@ -269,6 +387,25 @@ export function ProjectArtifactsModal({
     const rootArtifacts = currentPath === ''
         ? entries.filter(entry => ['AGENT_WORK_LOG.md', '.agent-screenshots'].includes(entry.name))
         : [];
+
+    const gitCommits = gitData?.commits || [];
+    const gitStatus = gitData?.status;
+    const headHash = gitStatus?.head;
+    const headIndex = headHash ? gitCommits.findIndex(commit => commit.hash === headHash) : -1;
+    const headCommit = headIndex >= 0 ? gitCommits[headIndex] : null;
+    const prevCommit = headIndex >= 0 ? gitCommits[headIndex + 1] : null;
+    const nextCommit = headIndex > 0 ? gitCommits[headIndex - 1] : null;
+    const isCheckingOut = gitCheckoutTarget !== null;
+    const branchLabel = gitStatus?.branch || (gitStatus?.isDetached ? '분리된 HEAD' : '알 수 없음');
+    const headLabel = headCommit?.shortHash || (headHash ? headHash.slice(0, 7) : '');
+    const syncLabel = gitStatus
+        ? (gitStatus.ahead || gitStatus.behind)
+            ? `앞섬 ${gitStatus.ahead} · 뒤처짐 ${gitStatus.behind}`
+            : '동기화됨'
+        : '';
+    const checkoutDisabled = isCheckingOut || gitLoading || gitActionLoading !== null || !gitStatus || gitStatus.isDirty;
+    const canCommit = !!gitStatus && gitData?.isGitRepo && gitStatus.isDirty && gitCommitMessage.trim().length > 0;
+    const canStash = !!gitStatus && gitData?.isGitRepo && gitStatus.isDirty;
 
     const modalTitle = previewOnly ? undefined : '📎 프로젝트 아티팩트';
 
@@ -301,6 +438,15 @@ export function ProjectArtifactsModal({
                                             }`}
                                     >
                                         파일
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('git')}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === 'git'
+                                            ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                                            }`}
+                                    >
+                                        Git
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('sites')}
@@ -537,6 +683,256 @@ export function ProjectArtifactsModal({
                                     )}
                                 </>
                             )}
+                        </div>
+                    )}
+
+                    {activeTab === 'git' && (
+                        <div className="h-full overflow-auto bg-[var(--bg-secondary)]">
+                            <div className="p-6 space-y-6">
+                                {!projectId && (
+                                    <div className="text-sm text-[var(--text-muted)]">프로젝트를 먼저 선택해주세요.</div>
+                                )}
+                                {projectId && (
+                                    <div className="space-y-5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-xs text-[var(--text-muted)]">
+                                                커밋 그래프와 이동을 한눈에 관리합니다.
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={loadGit}
+                                                disabled={gitLoading}
+                                            >
+                                                새로고침
+                                            </Button>
+                                        </div>
+                                        {gitError && (
+                                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-500">
+                                                {gitError}
+                                            </div>
+                                        )}
+                                        {gitLoading && !gitData && (
+                                            <div className="text-xs text-[var(--text-muted)]">불러오는 중...</div>
+                                        )}
+                                        {gitData && !gitData.isGitRepo && (
+                                            <div className="space-y-3">
+                                                <div className="text-sm text-[var(--text-muted)]">
+                                                    이 프로젝트는 Git 저장소가 아닙니다.
+                                                </div>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => handleGitAction('init')}
+                                                    disabled={gitActionLoading !== null}
+                                                >
+                                                    git init
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {gitData?.isGitRepo && gitStatus && (
+                                            <div className="space-y-5">
+                                                <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                                                    <span className="px-2.5 py-1 rounded-full border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-secondary)]">
+                                                        브랜치: {branchLabel}
+                                                    </span>
+                                                    <span className="px-2.5 py-1 rounded-full border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-secondary)]">
+                                                        HEAD: {headLabel || '알 수 없음'}
+                                                    </span>
+                                                    {gitStatus.upstream && (
+                                                        <span className="px-2.5 py-1 rounded-full border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-secondary)]">
+                                                            업스트림: {gitStatus.upstream}
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className={`px-2.5 py-1 rounded-full border bg-[var(--bg-card)] ${gitStatus.isDirty
+                                                            ? 'border-[var(--priority-high-text)] text-[var(--priority-high-text)]'
+                                                            : 'border-[var(--border-primary)] text-[var(--text-secondary)]'
+                                                            }`}
+                                                    >
+                                                        {gitStatus.isDirty ? '변경사항 있음' : '깨끗함'}
+                                                    </span>
+                                                    {syncLabel && (
+                                                        <span className="px-2.5 py-1 rounded-full border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-secondary)]">
+                                                            {syncLabel}
+                                                        </span>
+                                                    )}
+                                                    {gitData.graphRef && (
+                                                        <span className="px-2.5 py-1 rounded-full border border-[var(--border-primary)] bg-[var(--bg-card)] text-[var(--text-secondary)]">
+                                                            그래프 기준: {gitData.graphRef}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {gitStatus.isDirty && (
+                                                    <div className="rounded-lg border border-[var(--priority-high-text)] bg-[var(--priority-high)] px-4 py-2 text-xs text-[var(--priority-high-text)]">
+                                                        변경사항이 있어 커밋 이동이 비활성화되었습니다. 커밋하거나 스태시 후 다시 시도하세요.
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 space-y-3">
+                                                        <div className="text-sm font-medium text-[var(--text-primary)]">변경사항 스태시</div>
+                                                        <input
+                                                            type="text"
+                                                            value={gitStashMessage}
+                                                            onChange={(e) => setGitStashMessage(e.target.value)}
+                                                            placeholder="스태시 메시지 (선택)"
+                                                            className="w-full rounded-lg border border-[var(--border-primary)] bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                                                        />
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            onClick={() => handleGitAction('stash', { message: gitStashMessage })}
+                                                            disabled={!canStash || gitActionLoading !== null}
+                                                        >
+                                                            {gitActionLoading === 'stash' ? '스태시 중...' : 'stash'}
+                                                        </Button>
+                                                    </div>
+                                                    <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 space-y-3">
+                                                        <div className="text-sm font-medium text-[var(--text-primary)]">변경사항 커밋</div>
+                                                        <input
+                                                            type="text"
+                                                            value={gitCommitMessage}
+                                                            onChange={(e) => setGitCommitMessage(e.target.value)}
+                                                            placeholder="커밋 메시지 입력"
+                                                            className="w-full rounded-lg border border-[var(--border-primary)] bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                                                        />
+                                                        <Button
+                                                            variant="primary"
+                                                            size="sm"
+                                                            onClick={() => handleGitAction('commit', { message: gitCommitMessage })}
+                                                            disabled={!canCommit || gitActionLoading !== null}
+                                                        >
+                                                            {gitActionLoading === 'commit' ? '커밋 중...' : 'commit'}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => prevCommit && handleGitCheckout(prevCommit.hash)}
+                                                        disabled={!prevCommit || checkoutDisabled}
+                                                        className="w-full text-left rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 transition-colors hover:border-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                                                            <span>이전 커밋</span>
+                                                            <span>{prevCommit?.shortHash || '-'}</span>
+                                                        </div>
+                                                        <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">
+                                                            {prevCommit ? prevCommit.subject : '이동할 이전 커밋이 없습니다.'}
+                                                        </div>
+                                                        {prevCommit && (
+                                                            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+                                                                {prevCommit.author} · {prevCommit.relativeDate}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => nextCommit && handleGitCheckout(nextCommit.hash)}
+                                                        disabled={!nextCommit || checkoutDisabled}
+                                                        className="w-full text-left rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 transition-colors hover:border-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                                                            <span>다음 커밋</span>
+                                                            <span>{nextCommit?.shortHash || '-'}</span>
+                                                        </div>
+                                                        <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">
+                                                            {nextCommit ? nextCommit.subject : '앞선 커밋이 없습니다.'}
+                                                        </div>
+                                                        {nextCommit && (
+                                                            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+                                                                {nextCommit.author} · {nextCommit.relativeDate}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-sm font-medium text-[var(--text-primary)]">커밋 그래프</div>
+                                                    <div className="text-xs text-[var(--text-muted)]">
+                                                        커밋 {gitCommits.length}
+                                                    </div>
+                                                </div>
+                                                {gitCommits.length === 0 && (
+                                                    <div className="text-sm text-[var(--text-muted)]">
+                                                        표시할 커밋이 없습니다.
+                                                    </div>
+                                                )}
+                                                {gitCommits.length > 0 && (
+                                                    <div className="space-y-3">
+                                                        {gitCommits.map((commit) => {
+                                                            const isHead = commit.hash === headHash;
+                                                            const isMerge = commit.parents.length > 1;
+                                                            const isActive = gitCheckoutTarget === commit.hash;
+                                                            return (
+                                                                <div key={commit.hash} className="flex gap-3">
+                                                                    <div className="relative flex flex-col items-center pt-1">
+                                                                        <div className="absolute top-0 bottom-0 w-px bg-[var(--border-primary)]" />
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${isHead ? 'bg-[var(--accent-primary)]' : 'bg-[var(--text-muted)]'}`} />
+                                                                        {isMerge && (
+                                                                            <div className="mt-1 w-2 h-2 rounded-full border border-[var(--text-muted)]" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className={`relative flex-1 rounded-xl border p-4 ${isHead ? 'border-[var(--accent-primary)]' : 'border-[var(--border-primary)]'} bg-[var(--bg-card)]`}>
+                                                                        <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${isHead ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-primary)]'}`} />
+                                                                        <div className="pl-3 space-y-2">
+                                                                            <div className="flex items-start justify-between gap-3">
+                                                                                <div className="min-w-0">
+                                                                                    <div className="text-sm font-medium text-[var(--text-primary)] leading-snug break-words">
+                                                                                        {commit.subject}
+                                                                                    </div>
+                                                                                    <div className="mt-1 text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-2">
+                                                                                        <span className="font-mono">{commit.shortHash}</span>
+                                                                                        <span>·</span>
+                                                                                        <span>{commit.author}</span>
+                                                                                        <span>·</span>
+                                                                                        <span>{commit.relativeDate}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {isHead && (
+                                                                                        <span className="px-2 py-1 text-[10px] rounded-full border border-[var(--accent-primary)] text-[var(--accent-primary)]">
+                                                                                            HEAD
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <Button
+                                                                                        variant="secondary"
+                                                                                        size="sm"
+                                                                                        onClick={() => handleGitCheckout(commit.hash)}
+                                                                                        disabled={checkoutDisabled || isActive}
+                                                                                    >
+                                                                                        {isActive ? '이동 중' : '이동'}
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </div>
+                                                                            {commit.refs.length > 0 && (
+                                                                                <div className="flex flex-wrap gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                                                    {commit.refs.map(ref => (
+                                                                                        <span
+                                                                                            key={ref}
+                                                                                            className="px-2 py-0.5 rounded-full border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+                                                                                        >
+                                                                                            {ref}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                            {isMerge && (
+                                                                                <div className="text-[10px] text-[var(--text-muted)]">
+                                                                                    병합 커밋
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
