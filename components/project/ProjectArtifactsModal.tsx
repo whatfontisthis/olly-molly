@@ -178,6 +178,9 @@ export function ProjectArtifactsModal({
     const [gitLoading, setGitLoading] = useState(false);
     const [gitError, setGitError] = useState<string | null>(null);
     const [gitCheckoutTarget, setGitCheckoutTarget] = useState<string | null>(null);
+    const [gitActionLoading, setGitActionLoading] = useState<string | null>(null);
+    const [gitCommitMessage, setGitCommitMessage] = useState('');
+    const [gitStashMessage, setGitStashMessage] = useState('');
 
     const breadcrumbs = useMemo(() => {
         if (!currentPath) {
@@ -244,6 +247,9 @@ export function ProjectArtifactsModal({
         setGitData(null);
         setGitError(null);
         setGitCheckoutTarget(null);
+        setGitActionLoading(null);
+        setGitCommitMessage('');
+        setGitStashMessage('');
         if (projectId) {
             loadDirectory('');
         }
@@ -318,12 +324,13 @@ export function ProjectArtifactsModal({
     const handleGitCheckout = useCallback(async (target: string) => {
         if (!projectId) return;
         setGitCheckoutTarget(target);
+        setGitActionLoading('checkout');
         setGitError(null);
         try {
             const res = await fetch('/api/projects/git', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ projectId, target }),
+                body: JSON.stringify({ projectId, action: 'checkout', target }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -334,6 +341,35 @@ export function ProjectArtifactsModal({
             setGitError(err instanceof Error ? err.message : 'Failed to checkout commit');
         } finally {
             setGitCheckoutTarget(null);
+            setGitActionLoading(null);
+        }
+    }, [projectId, loadGit]);
+
+    const handleGitAction = useCallback(async (action: 'init' | 'stash' | 'commit', payload?: Record<string, string>) => {
+        if (!projectId) return;
+        setGitActionLoading(action);
+        setGitError(null);
+        try {
+            const res = await fetch('/api/projects/git', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, action, ...payload }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Git action failed');
+            }
+            if (action === 'commit') {
+                setGitCommitMessage('');
+            }
+            if (action === 'stash') {
+                setGitStashMessage('');
+            }
+            await loadGit();
+        } catch (err) {
+            setGitError(err instanceof Error ? err.message : 'Git action failed');
+        } finally {
+            setGitActionLoading(null);
         }
     }, [projectId, loadGit]);
 
@@ -367,7 +403,9 @@ export function ProjectArtifactsModal({
             ? `앞섬 ${gitStatus.ahead} · 뒤처짐 ${gitStatus.behind}`
             : '동기화됨'
         : '';
-    const checkoutDisabled = isCheckingOut || gitLoading || !gitStatus || gitStatus.isDirty;
+    const checkoutDisabled = isCheckingOut || gitLoading || gitActionLoading !== null || !gitStatus || gitStatus.isDirty;
+    const canCommit = !!gitStatus && gitData?.isGitRepo && gitStatus.isDirty && gitCommitMessage.trim().length > 0;
+    const canStash = !!gitStatus && gitData?.isGitRepo && gitStatus.isDirty;
 
     const modalTitle = previewOnly ? undefined : '📎 프로젝트 아티팩트';
 
@@ -678,8 +716,18 @@ export function ProjectArtifactsModal({
                                             <div className="text-xs text-[var(--text-muted)]">불러오는 중...</div>
                                         )}
                                         {gitData && !gitData.isGitRepo && (
-                                            <div className="text-sm text-[var(--text-muted)]">
-                                                이 프로젝트는 Git 저장소가 아닙니다.
+                                            <div className="space-y-3">
+                                                <div className="text-sm text-[var(--text-muted)]">
+                                                    이 프로젝트는 Git 저장소가 아닙니다.
+                                                </div>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => handleGitAction('init')}
+                                                    disabled={gitActionLoading !== null}
+                                                >
+                                                    git init
+                                                </Button>
                                             </div>
                                         )}
                                         {gitData?.isGitRepo && gitStatus && (
@@ -720,6 +768,44 @@ export function ProjectArtifactsModal({
                                                         변경사항이 있어 커밋 이동이 비활성화되었습니다. 커밋하거나 스태시 후 다시 시도하세요.
                                                     </div>
                                                 )}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 space-y-3">
+                                                        <div className="text-sm font-medium text-[var(--text-primary)]">변경사항 스태시</div>
+                                                        <input
+                                                            type="text"
+                                                            value={gitStashMessage}
+                                                            onChange={(e) => setGitStashMessage(e.target.value)}
+                                                            placeholder="스태시 메시지 (선택)"
+                                                            className="w-full rounded-lg border border-[var(--border-primary)] bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                                                        />
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            onClick={() => handleGitAction('stash', { message: gitStashMessage })}
+                                                            disabled={!canStash || gitActionLoading !== null}
+                                                        >
+                                                            {gitActionLoading === 'stash' ? '스태시 중...' : 'stash'}
+                                                        </Button>
+                                                    </div>
+                                                    <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 space-y-3">
+                                                        <div className="text-sm font-medium text-[var(--text-primary)]">변경사항 커밋</div>
+                                                        <input
+                                                            type="text"
+                                                            value={gitCommitMessage}
+                                                            onChange={(e) => setGitCommitMessage(e.target.value)}
+                                                            placeholder="커밋 메시지 입력"
+                                                            className="w-full rounded-lg border border-[var(--border-primary)] bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                                                        />
+                                                        <Button
+                                                            variant="primary"
+                                                            size="sm"
+                                                            onClick={() => handleGitAction('commit', { message: gitCommitMessage })}
+                                                            disabled={!canCommit || gitActionLoading !== null}
+                                                        >
+                                                            {gitActionLoading === 'commit' ? '커밋 중...' : 'commit'}
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <button
                                                         type="button"

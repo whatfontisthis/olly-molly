@@ -237,18 +237,18 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const projectId = typeof body.projectId === 'string' ? body.projectId : null;
+        const action = typeof body.action === 'string' ? body.action : 'checkout';
         const target = typeof body.target === 'string' ? body.target.trim() : '';
-
-        if (!target) {
-            return NextResponse.json({ error: 'Target commit is required' }, { status: 400 });
-        }
-        if (target.startsWith('-')) {
-            return NextResponse.json({ error: 'Invalid checkout target' }, { status: 400 });
-        }
+        const message = typeof body.message === 'string' ? body.message.trim() : '';
 
         const project = resolveProject(projectId);
         if (!project) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        if (action === 'init') {
+            await runGit(project.path, ['init']);
+            return NextResponse.json({ ok: true });
         }
 
         const repoExists = await isGitRepository(project.path);
@@ -256,11 +256,47 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Not a git repository' }, { status: 400 });
         }
 
-        await runGit(project.path, ['checkout', target]);
+        if (action === 'checkout') {
+            if (!target) {
+                return NextResponse.json({ error: 'Target commit is required' }, { status: 400 });
+            }
+            if (target.startsWith('-')) {
+                return NextResponse.json({ error: 'Invalid checkout target' }, { status: 400 });
+            }
+            await runGit(project.path, ['checkout', target]);
+            return NextResponse.json({ ok: true });
+        }
 
-        return NextResponse.json({ ok: true });
+        if (action === 'commit') {
+            if (!message) {
+                return NextResponse.json({ error: 'Commit message is required' }, { status: 400 });
+            }
+            const statusOutput = await runGit(project.path, ['status', '--porcelain']);
+            if (!statusOutput.trim()) {
+                return NextResponse.json({ error: 'No changes to commit' }, { status: 400 });
+            }
+            await runGit(project.path, ['add', '-A']);
+            await runGit(project.path, ['commit', '-m', message]);
+            return NextResponse.json({ ok: true });
+        }
+
+        if (action === 'stash') {
+            const statusOutput = await runGit(project.path, ['status', '--porcelain']);
+            if (!statusOutput.trim()) {
+                return NextResponse.json({ error: 'No changes to stash' }, { status: 400 });
+            }
+            const args = ['stash', 'push', '-u'];
+            if (message) {
+                args.push('-m', message);
+            }
+            await runGit(project.path, args);
+            return NextResponse.json({ ok: true });
+        }
+
+        return NextResponse.json({ error: 'Unsupported git action' }, { status: 400 });
+
     } catch (error) {
-        console.error('Error checking out commit:', error);
+        console.error('Error running git action:', error);
         return NextResponse.json({ error: extractGitError(error) }, { status: 400 });
     }
 }
